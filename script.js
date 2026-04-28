@@ -12,9 +12,6 @@ const normSummerInput = document.getElementById('normSummer');
 const normWinterInput = document.getElementById('normWinter');
 const seasonRadios = document.getElementsByName('season');
 
-// Глобальные переменные для погоды
-let currentTemperature = null;
-
 // =============================================
 // 1. ЗАПУСК КАМЕРЫ
 // =============================================
@@ -24,6 +21,10 @@ async function startCamera() {
             video: { facingMode: 'environment' }
         });
         video.srcObject = stream;
+        // Дождёмся, пока видео начнёт воспроизводиться
+        await new Promise((resolve) => {
+            video.onloadedmetadata = () => resolve();
+        });
         captureButton.disabled = false;
     } catch (err) {
         alert('Не удалось запустить камеру: ' + err.message);
@@ -46,7 +47,6 @@ async function fetchWeatherByLocation() {
             reject(new Error('Геолокация не поддерживается'));
             return;
         }
-
         navigator.geolocation.getCurrentPosition(
             async (position) => {
                 const lat = position.coords.latitude;
@@ -83,7 +83,6 @@ async function updateWeatherAndDetermineNorm() {
     try {
         weatherInfoDiv.textContent = '🌍 Определяем местоположение и погоду...';
         const temp = await fetchWeatherByLocation();
-        currentTemperature = temp;
         weatherInfoDiv.textContent = `🌡️ Температура: ${temp}°C. Режим: ${temp < 0 ? '❄️ Зима' : '☀️ Лето'}`;
         return temp < 0 ? 'winter' : 'summer';
     } catch (err) {
@@ -93,61 +92,89 @@ async function updateWeatherAndDetermineNorm() {
 }
 
 // =============================================
-// 3. РАСПОЗНАВАНИЕ И РАСЧЁТ (улучшено для телефона)
+// 3. РАСПОЗНАВАНИЕ И РАСЧЁТ (с пошаговым отчётом)
 // =============================================
 async function captureAndRecognize() {
-    // Меняем текст кнопки, чтобы было видно, что пошёл процесс
+    // Блокируем кнопку, чтобы не нажать дважды
     captureButton.disabled = true;
-    captureButton.textContent = '⏳ Распознаю...';
-    rawTextDiv.textContent = 'Идёт распознавание. Пожалуйста, держите телефон неподвижно...';
+    captureButton.textContent = '⏳ Идёт процесс...';
+    rawTextDiv.textContent = '⏱ Захват кадра...';
     calculationsDiv.textContent = '';
 
+    // Шаг 1: погода и сезон
     const season = await updateWeatherAndDetermineNorm();
     const norm = season === 'winter'
         ? parseFloat(normWinterInput.value) || 12
         : parseFloat(normSummerInput.value) || 10;
 
+    // Шаг 2: убедимся, что видео готово и имеет размеры
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+        rawTextDiv.textContent = 'Ошибка: камера не передаёт изображение. Перезапустите камеру.';
+        captureButton.disabled = false;
+        captureButton.textContent = '📸 Сфотографировать и распознать';
+        return;
+    }
+
+    // Шаг 3: захват кадра через canvas
+    let canvas;
     try {
-        // === Захват кадра через canvas (самый надёжный способ на мобильных) ===
-        const canvas = document.createElement('canvas');
+        canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // Пробуем русский, если долго – переключаем на английский
-        let text = '';
-        try {
-            const worker = await Tesseract.createWorker('rus');
-            const result = await Promise.race([
-                worker.recognize(canvas),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_RUS')), 45000))
-            ]);
-            text = result.data.text;
-            await worker.terminate();
-        } catch (e) {
-            if (e.message === 'TIMEOUT_RUS') {
-                rawTextDiv.textContent = 'Русский язык долго загружается, пробую английский...';
-                const worker = await Tesseract.createWorker('eng');
-                const result = await worker.recognize(canvas);
-                text = result.data.text;
-                await worker.terminate();
-            } else {
-                throw e;
-            }
-        }
-
-        rawTextDiv.textContent = text;
-        calculateData(text, norm, season);
-
-    } catch (err) {
-        console.error(err);
-        rawTextDiv.textContent = 'Ошибка: ' + err.message;
-        calculationsDiv.textContent = 'Попробуйте ещё раз. Если ошибка повторяется, проверьте доступ к интернету (для первой загрузки языкового пакета).';
-    } finally {
+        rawTextDiv.textContent = '✅ Кадр захвачен. Загружаю языковой пакет...';
+    } catch (e) {
+        rawTextDiv.textContent = 'Ошибка при создании снимка: ' + e.message;
         captureButton.disabled = false;
         captureButton.textContent = '📸 Сфотографировать и распознать';
+        return;
     }
+
+    // Шаг 4: распознавание с таймаутом и fallback
+    let text = '';
+    try {
+        // Пытаемся русский
+        text = await recognizeWithTimeout(canvas, 'rus', 45000);
+    } catch (e) {
+        if (e.message === 'TIMEOUT_RUS' || e.message.includes('tesseract')) {
+            rawTextDiv.textContent = '⚠ Русский пакет долго грузится, пробую английский...';
+            try {
+                text = await recognizeWithTimeout(canvas, 'eng', 30000);
+            } catch (e2) {
+                rawTextDiv.textContent = 'Ошибка при распознавании (английский): ' + e2.message;
+                captureButton.disabled = false;
+                captureButton.textContent = '📸 Сфотографировать и распознать';
+                return;
+            }
+        } else {
+            rawTextDiv.textContent = 'Ошибка распознавания: ' + e.message;
+            captureButton.disabled = false;
+            captureButton.textContent = '📸 Сфотографировать и распознать';
+            return;
+        }
+    }
+
+    rawTextDiv.textContent = '✅ Распознавание завершено. Обрабатываю данные...';
+    calculateData(text, norm, season);
+
+    // Восстанавливаем кнопку
+    captureButton.disabled = false;
+    captureButton.textContent = '📸 Сфотографировать и распознать';
+}
+
+// Вспомогательная функция распознавания с таймаутом
+async function recognizeWithTimeout(image, lang, timeoutMs) {
+    const worker = await Tesseract.createWorker(lang);
+    rawTextDiv.textContent = `📦 Язык ${lang} загружен, распознаю...`;
+    const result = await Promise.race([
+        worker.recognize(image),
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('TIMEOUT_RUS')), timeoutMs)
+        )
+    ]);
+    await worker.terminate();
+    return result.data.text;
 }
 
 // =============================================
