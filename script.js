@@ -24,7 +24,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ========== СОХРАНЕНИЕ ПРИ ИЗМЕНЕНИИ ==========
 normSummerInput.addEventListener('input', () => {
     localStorage.setItem('normSummer', normSummerInput.value);
 });
@@ -111,7 +110,62 @@ async function updateWeatherAndDetermineNorm() {
 }
 
 // =============================================
-// 3. РАСПОЗНАВАНИЕ И РАСЧЁТ (с пошаговым отчётом)
+// ПРЕДОБРАБОТКА ИЗОБРАЖЕНИЯ ДЛЯ УЛУЧШЕНИЯ OCR
+// =============================================
+function preprocessCanvas(sourceCanvas) {
+    // 1. Создаём новый canvas увеличенного размера (ширина 1500px)
+    const scale = 1500 / sourceCanvas.width;
+    const width = 1500;
+    const height = Math.floor(sourceCanvas.height * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    // Рисуем увеличенное изображение
+    ctx.drawImage(sourceCanvas, 0, 0, width, height);
+
+    // 2. Получаем данные пикселей
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+
+    // 3. Адаптивная бинаризация + повышение резкости
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4;
+            // Берём яркость (среднее арифметическое RGB)
+            const gray = (data[i] + data[i + 1] + data[i + 2]) / 3;
+
+            // Порог: 127 — можно настроить под свой документ (чем выше, тем больше пикселей станет чёрными)
+            const threshold = 127;
+            const value = gray > threshold ? 255 : 0;
+
+            data[i] = value;     // R
+            data[i + 1] = value; // G
+            data[i + 2] = value; // B
+        }
+    }
+
+    // Записываем обработанные пиксели
+    ctx.putImageData(imageData, 0, 0);
+
+    // 4. Повышаем резкость (лёгкий фильтр)
+    // Для мобильных устройств этот шаг может замедлить, поэтому он опционален.
+    // Включаем только если изображение было размытым.
+    // Здесь применим простейший unsharp masking через convolution, но для простоты пропустим.
+    // Если нужно — раскомментировать код ниже.
+    /*
+    const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
+    const sharpImageData = applyConvolution(ctx, 0, 0, width, height, kernel);
+    ctx.putImageData(sharpImageData, 0, 0);
+    */
+
+    return canvas;
+}
+
+// =============================================
+// 3. РАСПОЗНАВАНИЕ И РАСЧЁТ
 // =============================================
 async function captureAndRecognize() {
     captureButton.disabled = true;
@@ -131,14 +185,14 @@ async function captureAndRecognize() {
         return;
     }
 
-    let canvas;
+    let sourceCanvas;
     try {
-        canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        rawTextDiv.textContent = '✅ Кадр захвачен. Загружаю языковой пакет...';
+        sourceCanvas = document.createElement('canvas');
+        sourceCanvas.width = video.videoWidth;
+        sourceCanvas.height = video.videoHeight;
+        const ctx = sourceCanvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, sourceCanvas.width, sourceCanvas.height);
+        rawTextDiv.textContent = '✅ Кадр захвачен. Улучшаю качество...';
     } catch (e) {
         rawTextDiv.textContent = 'Ошибка при создании снимка: ' + e.message;
         captureButton.disabled = false;
@@ -146,14 +200,25 @@ async function captureAndRecognize() {
         return;
     }
 
+    // Предобработка (бинаризация, увеличение)
+    let processedCanvas;
+    try {
+        processedCanvas = preprocessCanvas(sourceCanvas);
+    } catch (e) {
+        console.warn('Предобработка не удалась, используем оригинал', e);
+        processedCanvas = sourceCanvas; // fallback
+    }
+
+    rawTextDiv.textContent = '📦 Загружаю языковой пакет (rus+eng)...';
+
     let text = '';
     try {
-        text = await recognizeWithTimeout(canvas, 'rus', 45000);
+        text = await recognizeWithSettings(processedCanvas, 'rus+eng', 45000);
     } catch (e) {
         if (e.message === 'TIMEOUT_RUS' || e.message.includes('tesseract')) {
             rawTextDiv.textContent = '⚠ Русский пакет долго грузится, пробую английский...';
             try {
-                text = await recognizeWithTimeout(canvas, 'eng', 30000);
+                text = await recognizeWithSettings(sourceCanvas, 'eng', 30000);
             } catch (e2) {
                 rawTextDiv.textContent = 'Ошибка при распознавании (английский): ' + e2.message;
                 captureButton.disabled = false;
@@ -175,9 +240,15 @@ async function captureAndRecognize() {
     captureButton.textContent = '📸 Сфотографировать и распознать';
 }
 
-async function recognizeWithTimeout(image, lang, timeoutMs) {
+async function recognizeWithSettings(image, lang, timeoutMs) {
     const worker = await Tesseract.createWorker(lang);
+    // Устанавливаем параметры для лучшего распознавания текстового документа
+    await worker.setParameters({
+        tessedit_pageseg_mode: '6', // единый блок текста
+        preserve_interword_spaces: '1',
+    });
     rawTextDiv.textContent = `📦 Язык ${lang} загружен, распознаю...`;
+
     const result = await Promise.race([
         worker.recognize(image),
         new Promise((_, reject) =>
