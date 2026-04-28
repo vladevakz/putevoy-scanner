@@ -55,7 +55,7 @@ async function startCamera() {
     }
 }
 
-// ========== ПОГОДА ==========
+// ========== ПОГОДА (с принудительным таймаутом) ==========
 function getSelectedSeasonMode() {
     for (const radio of seasonRadios) {
         if (radio.checked) return radio.value;
@@ -63,7 +63,40 @@ function getSelectedSeasonMode() {
     return 'auto';
 }
 
-async function fetchWeatherByLocation() {
+// Новый защитный таймаут для всей геолокации
+function fetchWeatherWithTimeout(timeoutMs = 8000) {
+    return new Promise((resolve, reject) => {
+        let settled = false;
+
+        // Таймаут – если геолокация не ответила за N секунд
+        const timer = setTimeout(() => {
+            if (!settled) {
+                settled = true;
+                reject(new Error('Превышено время ожидания геолокации'));
+            }
+        }, timeoutMs);
+
+        // Попытка через fetchWeatherByLocation
+        fetchWeatherByLocation()
+            .then(temp => {
+                if (!settled) {
+                    settled = true;
+                    clearTimeout(timer);
+                    resolve(temp);
+                }
+            })
+            .catch(err => {
+                if (!settled) {
+                    settled = true;
+                    clearTimeout(timer);
+                    reject(err);
+                }
+            });
+    });
+}
+
+// Оригинальная функция (возвращает Promise)
+function fetchWeatherByLocation() {
     return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
             reject(new Error('Геолокация не поддерживается'));
@@ -84,7 +117,7 @@ async function fetchWeatherByLocation() {
                 }
             },
             (err) => reject(new Error('Доступ к геолокации запрещён: ' + err.message)),
-            { timeout: 5000 }
+            { timeout: 5000 } // Стандартный таймаут браузера
         );
     });
 }
@@ -92,13 +125,15 @@ async function fetchWeatherByLocation() {
 async function updateWeatherAndDetermineNorm() {
     const mode = getSelectedSeasonMode();
     weatherInfoDiv.textContent = '';
+
     if (mode !== 'auto') {
         weatherInfoDiv.textContent = `📌 Сезон: ${mode === 'winter' ? 'Зима (вручную)' : 'Лето (вручную)'}`;
         return mode;
     }
+
     try {
         weatherInfoDiv.textContent = '🌍 Определяем местоположение и погоду...';
-        const temp = await fetchWeatherByLocation();
+        const temp = await fetchWeatherWithTimeout(8000); // <= жёсткий таймаут 8 секунд
         weatherInfoDiv.textContent = `🌡️ Температура: ${temp}°C. Режим: ${temp < 0 ? '❄️ Зима' : '☀️ Лето'}`;
         return temp < 0 ? 'winter' : 'summer';
     } catch (err) {
@@ -129,15 +164,17 @@ function preprocessCanvas(source) {
     return canvas;
 }
 
-// ========== РАСПОЗНАВАНИЕ С ТАЙМАУТОМ И ПРЕДОБРАБОТКОЙ ==========
+// ========== РАСПОЗНАВАНИЕ ==========
 async function captureAndRecognize() {
     captureButton.disabled = true;
     captureButton.textContent = '⏳ Идёт процесс...';
-    rawTextDiv.textContent = '⏱ Захват кадра...';
 
+    // --- Этап 1: погода (сначала, чтобы не висеть на «захвате кадра») ---
+    rawTextDiv.textContent = '🌤 Определяю погоду...';
     const season = await updateWeatherAndDetermineNorm();
     const norm = season === 'winter' ? parseFloat(normWinterInput.value) || 12 : parseFloat(normSummerInput.value) || 10;
 
+    // --- Этап 2: проверка камеры ---
     if (video.videoWidth === 0 || video.videoHeight === 0) {
         rawTextDiv.textContent = 'Ошибка: камера не передаёт изображение. Перезапустите камеру.';
         captureButton.disabled = false;
@@ -145,6 +182,8 @@ async function captureAndRecognize() {
         return;
     }
 
+    // --- Этап 3: захват кадра ---
+    rawTextDiv.textContent = '⏱ Захват кадра...';
     let srcCanvas;
     try {
         srcCanvas = document.createElement('canvas');
@@ -159,9 +198,11 @@ async function captureAndRecognize() {
         return;
     }
 
+    // --- Этап 4: предобработка ---
     let processed;
     try { processed = preprocessCanvas(srcCanvas); } catch (e) { processed = srcCanvas; }
 
+    // --- Этап 5: распознавание ---
     rawTextDiv.textContent = '📦 Загружаю языковой пакет (rus+eng)...';
     let text = '';
     try {
@@ -169,7 +210,9 @@ async function captureAndRecognize() {
     } catch (e) {
         if (e.message === 'TIMEOUT' || e.message.includes('tesseract')) {
             rawTextDiv.textContent = '⚠ Русский пакет долго грузится, пробую английский...';
-            try { text = await recognizeWithLang(srcCanvas, 'eng', 30000); } catch (e2) {
+            try {
+                text = await recognizeWithLang(srcCanvas, 'eng', 30000);
+            } catch (e2) {
                 rawTextDiv.textContent = 'Ошибка распознавания (англ): ' + e2.message;
                 captureButton.disabled = false;
                 captureButton.textContent = '📸 Сфотографировать и распознать';
@@ -183,6 +226,7 @@ async function captureAndRecognize() {
         }
     }
 
+    // --- Этап 6: расчёт и показ в модалке ---
     rawTextDiv.textContent = '✅ Распознано. Открываю результаты...';
     const data = extractDataFromText(text, norm, season);
     openResultModal(data);
@@ -206,7 +250,7 @@ async function recognizeWithLang(image, lang, timeoutMs) {
     return result.data.text;
 }
 
-// ========== ИЗВЛЕЧЕНИЕ ДАННЫХ ИЗ ТЕКСТА ==========
+// ========== ИЗВЛЕЧЕНИЕ ДАННЫХ ==========
 function extractDataFromText(rawText, norm, season) {
     const пробегMatch = rawText.match(/пробег[:\s]*(\d+)/i);
     const остатокВыездMatch = rawText.match(/остаток.?при.?выезде[:\s]*(\d+)/i);
@@ -228,7 +272,7 @@ function extractDataFromText(rawText, norm, season) {
     const отклонение = (расход - parseFloat(нормативныйРасход)).toFixed(1);
     const сезонНазвание = season === 'winter' ? '❄️ зимняя' : '☀️ летняя';
 
-    // Попытка найти дату в тексте
+    // Дата
     const dateMatch = rawText.match(/(\d{2}[.\/-]\d{2}[.\/-]\d{2,4})/);
     let dateStr = dateMatch ? dateMatch[1] : null;
     let isoDate = '';
@@ -257,7 +301,7 @@ function extractDataFromText(rawText, norm, season) {
 
 // ========== МОДАЛЬНОЕ ОКНО РЕЗУЛЬТАТОВ ==========
 function openResultModal(data) {
-    currentResultData = data; // сохраняем для кнопки "сохранить"
+    currentResultData = data;
 
     const manualNote = fuelAddedManual.value.trim() !== '' ? ' (вручную)' : (data.заправленоOcrMatch ? ' (из документа)' : ' (0)');
     modalCalculations.innerHTML = `
@@ -278,7 +322,6 @@ function openResultModal(data) {
     resultModal.style.display = 'flex';
 }
 
-// Закрытие модалки результатов
 function closeResultModalHandler() {
     resultModal.style.display = 'none';
     currentResultData = null;
@@ -317,7 +360,6 @@ saveToHistoryBtn.addEventListener('click', () => {
     };
     saveToHistory(entry);
     alert('✅ Сохранено!');
-    // Модалку не закрываем, чтобы можно было дальше смотреть
 });
 
 // ========== МОДАЛЬНОЕ ОКНО ИСТОРИИ ==========
@@ -327,7 +369,6 @@ function renderHistory() {
         historyList.innerHTML = '<p>История пуста.</p>';
         return;
     }
-    // Сортируем по дате (сначала новые)
     history.sort((a, b) => b.timestamp - a.timestamp);
     let html = '<table><thead><tr><th>Дата</th><th>Пробег</th><th>Расход общ.</th><th>Расход/100км</th><th>Норма</th><th>Сезон</th><th></th></tr></thead><tbody>';
     history.forEach((entry, index) => {
@@ -344,7 +385,6 @@ function renderHistory() {
     html += '</tbody></table>';
     historyList.innerHTML = html;
 
-    // Обработчики удаления
     document.querySelectorAll('.delete-entry').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const idx = parseInt(e.target.getAttribute('data-index'));
@@ -355,8 +395,6 @@ function renderHistory() {
 
 function deleteHistoryEntry(index) {
     const history = getHistory();
-    // Удаляем по индексу в отсортированном массиве (с учётом, что мы отобразили по timestamp)
-    // Лучше пересортировать и удалить по индексу как в отображении
     history.sort((a, b) => b.timestamp - a.timestamp);
     history.splice(index, 1);
     localStorage.setItem('putevoyHistory', JSON.stringify(history));
@@ -370,7 +408,6 @@ clearHistoryBtn.addEventListener('click', () => {
     }
 });
 
-// Открытие истории
 document.getElementById('historyButton').addEventListener('click', () => {
     renderHistory();
     historyModal.style.display = 'flex';
