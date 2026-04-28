@@ -1,3 +1,4 @@
+/* === ОСНОВА === */
 body {
     font-family: Arial, sans-serif;
     margin: 0;
@@ -12,70 +13,102 @@ body {
 .container {
     background: white;
     border-radius: 15px;
-    padding: 20px;
+    padding: 15px;
     max-width: 500px;
     width: 100%;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     text-align: center;
+    margin: 10px;
+    box-sizing: border-box;
 }
 
+h1 {
+    font-size: 1.4em;
+    margin: 5px 0 10px;
+}
+
+h2 {
+    font-size: 1.2em;
+    margin: 10px 0 5px;
+}
+
+/* === ПАНЕЛЬ НАСТРОЕК === */
 .settings-panel {
     background: #f0f8ff;
-    padding: 12px;
+    padding: 10px;
     border-radius: 10px;
-    margin-bottom: 15px;
+    margin-bottom: 12px;
     text-align: left;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .settings-panel h3 {
     margin-top: 0;
     margin-bottom: 8px;
+    font-size: 1em;
 }
 
 .setting-row {
-    margin-bottom: 8px;
+    margin-bottom: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 .setting-row label {
-    display: inline-block;
     margin-right: 5px;
+    min-width: 70px;
 }
 
 .setting-row input[type="number"] {
-    width: 70px;
+    width: 60px;
     padding: 4px;
     border-radius: 5px;
     border: 1px solid #ccc;
+    font-size: 14px;
 }
 
 .setting-row small {
     display: block;
     color: #666;
     margin-top: 2px;
+    width: 100%;
+    font-size: 12px;
+}
+
+.season-select {
+    gap: 5px;
+}
+
+.season-select span {
+    margin-right: 5px;
 }
 
 .season-select label {
-    margin-right: 10px;
+    margin-right: 8px;
     cursor: pointer;
+    font-size: 14px;
 }
 
 .weather-info {
     margin-top: 6px;
     font-style: italic;
     color: #2c3e50;
+    font-size: 13px;
 }
 
+/* === КНОПКИ === */
 button {
     background: #007aff;
     color: white;
     border: none;
-    padding: 12px 24px;
-    font-size: 18px;
+    padding: 10px 18px;
+    font-size: 16px;
     border-radius: 8px;
     cursor: pointer;
-    margin: 10px 5px;
+    margin: 6px 2px;
     transition: background 0.2s;
+    white-space: nowrap;
 }
 
 button.secondary {
@@ -103,9 +136,10 @@ button:not(:disabled):hover {
     opacity: 0.9;
 }
 
+/* === ВИДЕО === */
 .video-container {
     position: relative;
-    margin: 15px 0;
+    margin: 10px 0;
 }
 
 video {
@@ -116,21 +150,23 @@ video {
 
 #captureButton {
     position: absolute;
-    bottom: 15px;
+    bottom: 10px;
     left: 50%;
     transform: translateX(-50%);
     background: #ff9500;
+    font-size: 16px;
+    padding: 10px 20px;
 }
 
 #messageBox {
-    min-height: 40px;
-    margin-top: 10px;
+    min-height: 35px;
+    margin-top: 8px;
     font-size: 14px;
     color: #333;
     text-align: left;
 }
 
-/* ======= МОДАЛЬНЫЕ ОКНА ======= */
+/* === МОДАЛЬНЫЕ ОКНА === */
 .modal {
     display: none;
     position: fixed;
@@ -147,30 +183,27 @@ video {
 
 .modal-content {
     background: #fff;
-    margin: 20px;
-    padding: 25px;
+    margin: 15px;
+    padding: 20px;
     border-radius: 15px;
-    max-width: 500px;
+    max-width: 400px;
     width: 100%;
     box-shadow: 0 8px 24px rgba(0,0,0,0.3);
     position: relative;
     text-align: left;
     animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-20px); }
-    to { opacity: 1; transform: translateY(0); }
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 .close {
     color: #aaa;
     float: right;
-    font-size: 32px;
+    font-size: 28px;
     font-weight: bold;
     cursor: pointer;
     line-height: 0.6;
-    margin-left: 15px;
+    margin-left: 10px;
 }
 
 .close:hover {
@@ -178,40 +211,71 @@ video {
 }
 
 #modalCalculations p {
-    margin: 8px 0;
-    font-size: 16px;
+    margin: 6px 0;
+    font-size: 15px;
 }
 
 .modal-actions {
-    margin-top: 20px;
+    margin-top: 15px;
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
-/* История */
+/* === ТАБЛИЦА ИСТОРИИ (адаптивная) === */
+#historyList {
+    width: 100%;
+    overflow-x: auto;  /* горизонтальная прокрутка, если таблица шире экрана */
+    -webkit-overflow-scrolling: touch; /* плавная прокрутка на iOS */
+    margin-bottom: 10px;
+}
+
 #historyList table {
     width: 100%;
+    min-width: 350px; /* чтобы таблица не сжималась слишком сильно */
     border-collapse: collapse;
-    margin-bottom: 15px;
-    font-size: 14px;
+    font-size: 13px;
 }
 
-#historyList th, #historyList td {
+#historyList th,
+#historyList td {
     border: 1px solid #ddd;
-    padding: 8px;
+    padding: 6px 5px;
     text-align: left;
+    white-space: nowrap; /* запрет переноса внутри ячейки */
 }
 
 #historyList th {
     background-color: #f2f2f2;
+    font-weight: bold;
 }
 
+/* Кнопка удаления внутри таблицы */
 .delete-entry {
     background: none;
     border: none;
     color: #dc3545;
-    font-size: 18px;
+    font-size: 16px;
     cursor: pointer;
-    padding: 0 5px;
+    padding: 0 3px;
+}
+
+/* Для очень узких экранов – дополнительно уменьшаем отступы */
+@media (max-width: 400px) {
+    .container {
+        padding: 10px;
+    }
+    button {
+        padding: 8px 14px;
+        font-size: 14px;
+    }
+    #captureButton {
+        font-size: 14px;
+        padding: 8px 16px;
+    }
+    .modal-content {
+        margin: 10px;
+        padding: 15px;
+    }
 }
