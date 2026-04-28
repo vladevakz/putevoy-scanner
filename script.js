@@ -12,6 +12,26 @@ const normSummerInput = document.getElementById('normSummer');
 const normWinterInput = document.getElementById('normWinter');
 const seasonRadios = document.getElementsByName('season');
 
+// ========== ВОССТАНОВЛЕНИЕ НОРМ ИЗ LOCALSTORAGE ==========
+window.addEventListener('DOMContentLoaded', () => {
+    const savedSummer = localStorage.getItem('normSummer');
+    const savedWinter = localStorage.getItem('normWinter');
+    if (savedSummer !== null) {
+        normSummerInput.value = savedSummer;
+    }
+    if (savedWinter !== null) {
+        normWinterInput.value = savedWinter;
+    }
+});
+
+// ========== СОХРАНЕНИЕ ПРИ ИЗМЕНЕНИИ ==========
+normSummerInput.addEventListener('input', () => {
+    localStorage.setItem('normSummer', normSummerInput.value);
+});
+normWinterInput.addEventListener('input', () => {
+    localStorage.setItem('normWinter', normWinterInput.value);
+});
+
 // =============================================
 // 1. ЗАПУСК КАМЕРЫ
 // =============================================
@@ -21,7 +41,6 @@ async function startCamera() {
             video: { facingMode: 'environment' }
         });
         video.srcObject = stream;
-        // Дождёмся, пока видео начнёт воспроизводиться
         await new Promise((resolve) => {
             video.onloadedmetadata = () => resolve();
         });
@@ -95,19 +114,16 @@ async function updateWeatherAndDetermineNorm() {
 // 3. РАСПОЗНАВАНИЕ И РАСЧЁТ (с пошаговым отчётом)
 // =============================================
 async function captureAndRecognize() {
-    // Блокируем кнопку, чтобы не нажать дважды
     captureButton.disabled = true;
     captureButton.textContent = '⏳ Идёт процесс...';
     rawTextDiv.textContent = '⏱ Захват кадра...';
     calculationsDiv.textContent = '';
 
-    // Шаг 1: погода и сезон
     const season = await updateWeatherAndDetermineNorm();
     const norm = season === 'winter'
         ? parseFloat(normWinterInput.value) || 12
         : parseFloat(normSummerInput.value) || 10;
 
-    // Шаг 2: убедимся, что видео готово и имеет размеры
     if (video.videoWidth === 0 || video.videoHeight === 0) {
         rawTextDiv.textContent = 'Ошибка: камера не передаёт изображение. Перезапустите камеру.';
         captureButton.disabled = false;
@@ -115,7 +131,6 @@ async function captureAndRecognize() {
         return;
     }
 
-    // Шаг 3: захват кадра через canvas
     let canvas;
     try {
         canvas = document.createElement('canvas');
@@ -131,10 +146,8 @@ async function captureAndRecognize() {
         return;
     }
 
-    // Шаг 4: распознавание с таймаутом и fallback
     let text = '';
     try {
-        // Пытаемся русский
         text = await recognizeWithTimeout(canvas, 'rus', 45000);
     } catch (e) {
         if (e.message === 'TIMEOUT_RUS' || e.message.includes('tesseract')) {
@@ -158,12 +171,10 @@ async function captureAndRecognize() {
     rawTextDiv.textContent = '✅ Распознавание завершено. Обрабатываю данные...';
     calculateData(text, norm, season);
 
-    // Восстанавливаем кнопку
     captureButton.disabled = false;
     captureButton.textContent = '📸 Сфотографировать и распознать';
 }
 
-// Вспомогательная функция распознавания с таймаутом
 async function recognizeWithTimeout(image, lang, timeoutMs) {
     const worker = await Tesseract.createWorker(lang);
     rawTextDiv.textContent = `📦 Язык ${lang} загружен, распознаю...`;
