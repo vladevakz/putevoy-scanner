@@ -13,8 +13,7 @@ const normWinterInput = document.getElementById('normWinter');
 const seasonRadios = document.getElementsByName('season');
 
 // Глобальные переменные для погоды
-let currentTemperature = null;   // температура с API
-let weatherFetchAttempted = false;
+let currentTemperature = null;
 
 // =============================================
 // 1. ЗАПУСК КАМЕРЫ
@@ -38,7 +37,7 @@ function getSelectedSeasonMode() {
     for (const radio of seasonRadios) {
         if (radio.checked) return radio.value;
     }
-    return 'auto'; // по умолчанию
+    return 'auto';
 }
 
 async function fetchWeatherByLocation() {
@@ -53,7 +52,6 @@ async function fetchWeatherByLocation() {
                 const lat = position.coords.latitude;
                 const lon = position.coords.longitude;
                 try {
-                    // Open-Meteo API (бесплатно, без ключа)
                     const response = await fetch(
                         `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`
                     );
@@ -77,13 +75,11 @@ async function updateWeatherAndDetermineNorm() {
     weatherInfoDiv.textContent = '';
 
     if (mode !== 'auto') {
-        // Ручной выбор – просто показываем, какой сезон принудительно
         const seasonName = mode === 'winter' ? 'Зима (вручную)' : 'Лето (вручную)';
         weatherInfoDiv.textContent = `📌 Сезон: ${seasonName}`;
         return mode;
     }
 
-    // Автоматический режим: запрашиваем погоду
     try {
         weatherInfoDiv.textContent = '🌍 Определяем местоположение и погоду...';
         const temp = await fetchWeatherByLocation();
@@ -91,42 +87,73 @@ async function updateWeatherAndDetermineNorm() {
         weatherInfoDiv.textContent = `🌡️ Температура: ${temp}°C. Режим: ${temp < 0 ? '❄️ Зима' : '☀️ Лето'}`;
         return temp < 0 ? 'winter' : 'summer';
     } catch (err) {
-        // Если не удалось – fallback на летнюю норму с уведомлением
         weatherInfoDiv.textContent = '⚠️ Погода недоступна, используется летняя норма';
         return 'summer';
     }
 }
 
 // =============================================
-// 3. РАСПОЗНАВАНИЕ И РАСЧЁТ
+// 3. РАСПОЗНАВАНИЕ И РАСЧЁТ (улучшено для телефона)
 // =============================================
 async function captureAndRecognize() {
-    rawTextDiv.textContent = 'Идёт распознавание...';
+    // Меняем текст кнопки, чтобы было видно, что пошёл процесс
+    captureButton.disabled = true;
+    captureButton.textContent = '⏳ Распознаю...';
+    rawTextDiv.textContent = 'Идёт распознавание. Пожалуйста, держите телефон неподвижно...';
     calculationsDiv.textContent = '';
 
-    // Сначала определяем сезон (и получаем погоду, если нужно)
     const season = await updateWeatherAndDetermineNorm();
-
-    // Получаем норму из соответствующего поля
     const norm = season === 'winter'
         ? parseFloat(normWinterInput.value) || 12
         : parseFloat(normSummerInput.value) || 10;
 
-    // Запускаем распознавание
-    const worker = await Tesseract.createWorker('rus');
-    const { data: { text } } = await worker.recognize(video);
-    rawTextDiv.textContent = text;
-    await worker.terminate();
+    try {
+        // === Захват кадра через canvas (самый надёжный способ на мобильных) ===
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Рассчитываем
-    calculateData(text, norm, season);
+        // Пробуем русский, если долго – переключаем на английский
+        let text = '';
+        try {
+            const worker = await Tesseract.createWorker('rus');
+            const result = await Promise.race([
+                worker.recognize(canvas),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_RUS')), 45000))
+            ]);
+            text = result.data.text;
+            await worker.terminate();
+        } catch (e) {
+            if (e.message === 'TIMEOUT_RUS') {
+                rawTextDiv.textContent = 'Русский язык долго загружается, пробую английский...';
+                const worker = await Tesseract.createWorker('eng');
+                const result = await worker.recognize(canvas);
+                text = result.data.text;
+                await worker.terminate();
+            } else {
+                throw e;
+            }
+        }
+
+        rawTextDiv.textContent = text;
+        calculateData(text, norm, season);
+
+    } catch (err) {
+        console.error(err);
+        rawTextDiv.textContent = 'Ошибка: ' + err.message;
+        calculationsDiv.textContent = 'Попробуйте ещё раз. Если ошибка повторяется, проверьте доступ к интернету (для первой загрузки языкового пакета).';
+    } finally {
+        captureButton.disabled = false;
+        captureButton.textContent = '📸 Сфотографировать и распознать';
+    }
 }
 
 // =============================================
 // 4. ФУНКЦИЯ ИЗВЛЕЧЕНИЯ ДАННЫХ И ПОДСЧЁТА
 // =============================================
 function calculateData(rawText, norm, season) {
-    // Парсим данные из текста (регулярки)
     const пробегMatch = rawText.match(/пробег[:\s]*(\d+)/i);
     const остатокВыездMatch = rawText.match(/остаток.?при.?выезде[:\s]*(\d+)/i);
     const остатокВозвратMatch = rawText.match(/остаток.?при.?возврате[:\s]*(\d+)/i);
@@ -136,7 +163,6 @@ function calculateData(rawText, norm, season) {
     const остатокВыезд = остатокВыездMatch ? parseFloat(остатокВыездMatch[1]) : 0;
     const остатокВозврат = остатокВозвратMatch ? parseFloat(остатокВозвратMatch[1]) : 0;
 
-    // Заправка: берём из ручного поля, если заполнено; иначе – из OCR
     let заправлено = 0;
     const manualValue = fuelAddedManual.value.trim();
     if (manualValue !== '') {
@@ -145,16 +171,12 @@ function calculateData(rawText, norm, season) {
         заправлено = parseFloat(заправленоOcrMatch[1]);
     }
 
-    // Фактический расход
     const расход = остатокВыезд + заправлено - остатокВозврат;
     const расходНа100км = пробег > 0 ? ((расход / пробег) * 100).toFixed(1) : 0;
-
-    // Нормативный расход (л) = пробег * норма / 100
     const нормативныйРасход = пробег > 0 ? ((пробег * norm) / 100).toFixed(1) : 0;
     const отклонение = (расход - parseFloat(нормативныйРасход)).toFixed(1);
     const сезонНазвание = season === 'winter' ? '❄️ зимняя' : '☀️ летняя';
 
-    // Вывод результатов
     calculationsDiv.innerHTML = `
         <p><strong>📏 Пробег:</strong> ${пробег} км</p>
         <p><strong>⛽ Остаток при выезде:</strong> ${остатокВыезд} л</p>
@@ -173,12 +195,3 @@ function calculateData(rawText, norm, season) {
 // Привязка событий
 startButton.addEventListener('click', startCamera);
 captureButton.addEventListener('click', captureAndRecognize);
-
-// При ручном переключении радио можно сбросить погоду (необязательно)
-for (const radio of seasonRadios) {
-    radio.addEventListener('change', () => {
-        if (radio.value !== 'auto') {
-            weatherInfoDiv.textContent = '';
-        }
-    });
-}
