@@ -37,19 +37,42 @@
         </div>
 
         <button id="startButton">📷 Запустить камеру</button>
+        <button id="historyButton" class="secondary">📋 История</button>
 
         <div class="camera-section">
             <div class="video-container">
                 <video id="video" playsinline autoplay></video>
                 <button id="captureButton" disabled>📸 Сфотографировать и распознать</button>
             </div>
-            <div id="resultSection">
-                <h2>Результаты:</h2>
+            <div id="messageBox">
                 <div id="rawText"></div>
-                <div id="calculations"></div>
             </div>
         </div>
     </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО: РЕЗУЛЬТАТЫ -->
+    <div id="resultModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="closeResultModal">&times;</span>
+            <h2>📊 Результаты расчёта</h2>
+            <div id="modalCalculations"></div>
+            <div class="modal-actions">
+                <button id="saveToHistoryBtn">💾 Сохранить в историю</button>
+                <button id="closeResultBtn" class="secondary">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО: ИСТОРИЯ -->
+    <div id="historyModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="closeHistoryModal">&times;</span>
+            <h2>📚 Сохранённые расчёты</h2>
+            <div id="historyList"></div>
+            <button id="clearHistoryBtn" class="danger">🗑 Очистить историю</button>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
