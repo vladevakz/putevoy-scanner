@@ -1,3 +1,4 @@
+/* === ОСНОВА === */
 body {
     font-family: Arial, sans-serif;
     margin: 0;
@@ -21,9 +22,17 @@ body {
     box-sizing: border-box;
 }
 
-h1 { font-size: 1.4em; margin: 5px 0 10px; }
-h2 { font-size: 1.2em; margin: 10px 0 5px; }
+h1 {
+    font-size: 1.4em;
+    margin: 5px 0 10px;
+}
 
+h2 {
+    font-size: 1.2em;
+    margin: 10px 0 5px;
+}
+
+/* === ПАНЕЛЬ НАСТРОЕК === */
 .settings-panel {
     background: #f0f8ff;
     padding: 10px;
@@ -34,7 +43,9 @@ h2 { font-size: 1.2em; margin: 10px 0 5px; }
 }
 
 .settings-panel h3 {
-    margin-top: 0; margin-bottom: 8px; font-size: 1em;
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 1em;
 }
 
 .setting-row {
@@ -46,11 +57,11 @@ h2 { font-size: 1.2em; margin: 10px 0 5px; }
 
 .setting-row label {
     margin-right: 5px;
-    min-width: 90px;
+    min-width: 110px;
 }
 
 .setting-row input[type="number"] {
-    width: 65px;
+    width: 70px;
     padding: 4px;
     border-radius: 5px;
     border: 1px solid #ccc;
@@ -65,9 +76,19 @@ h2 { font-size: 1.2em; margin: 10px 0 5px; }
     font-size: 12px;
 }
 
-.season-select { gap: 5px; }
-.season-select span { margin-right: 5px; }
-.season-select label { margin-right: 8px; cursor: pointer; font-size: 14px; }
+.season-select {
+    gap: 5px;
+}
+
+.season-select span {
+    margin-right: 5px;
+}
+
+.season-select label {
+    margin-right: 8px;
+    cursor: pointer;
+    font-size: 14px;
+}
 
 .weather-info {
     margin-top: 6px;
@@ -76,6 +97,7 @@ h2 { font-size: 1.2em; margin: 10px 0 5px; }
     font-size: 13px;
 }
 
+/* === КНОПКИ === */
 button {
     background: #007aff;
     color: white;
@@ -89,56 +111,124 @@ button {
     white-space: nowrap;
 }
 
-button.secondary { background: #6c757d; }
-button.secondary:hover { background: #5a6268; }
-button.danger { background: #dc3545; }
-button.danger:hover { background: #c82333; }
-button:disabled { background: #aaa; cursor: not-allowed; }
-button:not(:disabled):hover { opacity: 0.9; }
+button.secondary {
+    background: #6c757d;
+}
 
-.video-container { position: relative; margin: 10px 0; }
-video { width: 100%; border-radius: 10px; background: #000; }
+button.secondary:hover {
+    background: #5a6268;
+}
+
+button.danger {
+    background: #dc3545;
+}
+
+button.danger:hover {
+    background: #c82333;
+}
+
+button:disabled {
+    background: #aaa;
+    cursor: not-allowed;
+}
+
+button:not(:disabled):hover {
+    opacity: 0.9;
+}
+
+/* === ВИДЕО === */
+.video-container {
+    position: relative;
+    margin: 10px 0;
+}
+
+video {
+    width: 100%;
+    border-radius: 10px;
+    background: #000;
+}
 
 #captureButton {
     position: absolute;
-    bottom: 10px; left: 50%; transform: translateX(-50%);
-    background: #ff9500; font-size: 16px; padding: 10px 20px;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ff9500;
+    font-size: 16px;
+    padding: 10px 20px;
 }
 
-#messageBox { min-height: 35px; margin-top: 8px; font-size: 14px; color: #333; text-align: left; }
+#messageBox {
+    min-height: 35px;
+    margin-top: 8px;
+    font-size: 14px;
+    color: #333;
+    text-align: left;
+}
 
+/* === МОДАЛЬНЫЕ ОКНА === */
 .modal {
     display: none;
-    position: fixed; z-index: 1000; left: 0; top: 0;
-    width: 100%; height: 100%;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
     background-color: rgba(0,0,0,0.5);
-    justify-content: center; align-items: center; overflow-y: auto;
+    justify-content: center;
+    align-items: center;
+    overflow-y: auto;
 }
 
 .modal-content {
     background: #fff;
-    margin: 15px; padding: 20px;
+    margin: 15px;
+    padding: 20px;
     border-radius: 15px;
-    max-width: 400px; width: 100%;
+    max-width: 400px;
+    width: 100%;
     box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-    position: relative; text-align: left;
+    position: relative;
+    text-align: left;
     animation: fadeIn 0.2s ease;
-    max-height: 90vh; overflow-y: auto;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .close {
-    color: #aaa; float: right; font-size: 28px; font-weight: bold;
-    cursor: pointer; line-height: 0.6; margin-left: 10px;
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 0.6;
+    margin-left: 10px;
 }
-.close:hover { color: #000; }
 
-#modalCalculations p { margin: 6px 0; font-size: 15px; }
+.close:hover {
+    color: #000;
+}
+
+#modalCalculations p {
+    margin: 6px 0;
+    font-size: 15px;
+}
 
 .modal-actions {
     margin-top: 15px;
-    display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
+/* === ТАБЛИЦА ИСТОРИИ (адаптивная) === */
 #historyList {
     width: 100%;
     overflow-x: auto;
@@ -147,25 +237,56 @@ video { width: 100%; border-radius: 10px; background: #000; }
 }
 
 #historyList table {
-    width: 100%; min-width: 400px;
-    border-collapse: collapse; font-size: 13px;
+    width: 100%;
+    min-width: 420px;
+    border-collapse: collapse;
+    font-size: 13px;
 }
 
-#historyList th, #historyList td {
-    border: 1px solid #ddd; padding: 6px 5px;
-    text-align: left; white-space: nowrap;
+#historyList th,
+#historyList td {
+    border: 1px solid #ddd;
+    padding: 6px 5px;
+    text-align: left;
+    white-space: nowrap;
 }
 
-#historyList th { background-color: #f2f2f2; font-weight: bold; }
+#historyList th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+}
 
 .delete-entry {
-    background: none; border: none; color: #dc3545;
-    font-size: 16px; cursor: pointer; padding: 0 3px;
+    background: none;
+    border: none;
+    color: #dc3545;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 3px;
 }
 
+/* === АДАПТАЦИЯ ПОД ОЧЕНЬ МАЛЕНЬКИЕ ЭКРАНЫ === */
 @media (max-width: 400px) {
-    .container { padding: 10px; }
-    button { padding: 8px 14px; font-size: 14px; }
-    #captureButton { font-size: 14px; padding: 8px 16px; }
-    .modal-content { margin: 10px; padding: 15px; }
+    .container {
+        padding: 10px;
+    }
+
+    button {
+        padding: 8px 14px;
+        font-size: 14px;
+    }
+
+    #captureButton {
+        font-size: 14px;
+        padding: 8px 16px;
+    }
+
+    .modal-content {
+        margin: 10px;
+        padding: 15px;
+    }
+
+    .setting-row label {
+        min-width: 90px;
+    }
 }
