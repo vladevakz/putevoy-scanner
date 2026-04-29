@@ -5,7 +5,9 @@ const startButton = document.getElementById('startButton');
 const rawTextDiv = document.getElementById('rawText');
 const weatherInfoDiv = document.getElementById('weatherInfo');
 
-// Настройки
+// Поля ручного ввода
+const cityKmInput = document.getElementById('cityKm');
+const highwayKmInput = document.getElementById('highwayKm');
 const fuelAddedManual = document.getElementById('fuelAddedManual');
 const normSummerInput = document.getElementById('normSummer');
 const normWinterInput = document.getElementById('normWinter');
@@ -23,7 +25,7 @@ const closeHistoryModal = document.getElementById('closeHistoryModal');
 const historyList = document.getElementById('historyList');
 const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
-// Глобальный объект с текущими результатами (для сохранения)
+// Текущие данные для сохранения
 let currentResultData = null;
 
 // ========== ВОССТАНОВЛЕНИЕ НОРМ ИЗ LOCALSTORAGE ==========
@@ -55,7 +57,7 @@ async function startCamera() {
     }
 }
 
-// ========== ПОГОДА (с принудительным таймаутом) ==========
+// ========== ПОГОДА (с жёстким таймаутом) ==========
 function getSelectedSeasonMode() {
     for (const radio of seasonRadios) {
         if (radio.checked) return radio.value;
@@ -63,12 +65,9 @@ function getSelectedSeasonMode() {
     return 'auto';
 }
 
-// Новый защитный таймаут для всей геолокации
 function fetchWeatherWithTimeout(timeoutMs = 8000) {
     return new Promise((resolve, reject) => {
         let settled = false;
-
-        // Таймаут – если геолокация не ответила за N секунд
         const timer = setTimeout(() => {
             if (!settled) {
                 settled = true;
@@ -76,26 +75,16 @@ function fetchWeatherWithTimeout(timeoutMs = 8000) {
             }
         }, timeoutMs);
 
-        // Попытка через fetchWeatherByLocation
         fetchWeatherByLocation()
             .then(temp => {
-                if (!settled) {
-                    settled = true;
-                    clearTimeout(timer);
-                    resolve(temp);
-                }
+                if (!settled) { settled = true; clearTimeout(timer); resolve(temp); }
             })
             .catch(err => {
-                if (!settled) {
-                    settled = true;
-                    clearTimeout(timer);
-                    reject(err);
-                }
+                if (!settled) { settled = true; clearTimeout(timer); reject(err); }
             });
     });
 }
 
-// Оригинальная функция (возвращает Promise)
 function fetchWeatherByLocation() {
     return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
@@ -117,7 +106,7 @@ function fetchWeatherByLocation() {
                 }
             },
             (err) => reject(new Error('Доступ к геолокации запрещён: ' + err.message)),
-            { timeout: 5000 } // Стандартный таймаут браузера
+            { timeout: 5000 }
         );
     });
 }
@@ -133,7 +122,7 @@ async function updateWeatherAndDetermineNorm() {
 
     try {
         weatherInfoDiv.textContent = '🌍 Определяем местоположение и погоду...';
-        const temp = await fetchWeatherWithTimeout(8000); // <= жёсткий таймаут 8 секунд
+        const temp = await fetchWeatherWithTimeout(8000);
         weatherInfoDiv.textContent = `🌡️ Температура: ${temp}°C. Режим: ${temp < 0 ? '❄️ Зима' : '☀️ Лето'}`;
         return temp < 0 ? 'winter' : 'summer';
     } catch (err) {
@@ -169,20 +158,20 @@ async function captureAndRecognize() {
     captureButton.disabled = true;
     captureButton.textContent = '⏳ Идёт процесс...';
 
-    // --- Этап 1: погода (сначала, чтобы не висеть на «захвате кадра») ---
+    // 1. Погода
     rawTextDiv.textContent = '🌤 Определяю погоду...';
     const season = await updateWeatherAndDetermineNorm();
     const norm = season === 'winter' ? parseFloat(normWinterInput.value) || 12 : parseFloat(normSummerInput.value) || 10;
 
-    // --- Этап 2: проверка камеры ---
+    // 2. Проверка камеры
     if (video.videoWidth === 0 || video.videoHeight === 0) {
-        rawTextDiv.textContent = 'Ошибка: камера не передаёт изображение. Перезапустите камеру.';
+        rawTextDiv.textContent = 'Ошибка: камера не передаёт изображение.';
         captureButton.disabled = false;
         captureButton.textContent = '📸 Сфотографировать и распознать';
         return;
     }
 
-    // --- Этап 3: захват кадра ---
+    // 3. Захват кадра
     rawTextDiv.textContent = '⏱ Захват кадра...';
     let srcCanvas;
     try {
@@ -198,11 +187,11 @@ async function captureAndRecognize() {
         return;
     }
 
-    // --- Этап 4: предобработка ---
+    // 4. Предобработка
     let processed;
     try { processed = preprocessCanvas(srcCanvas); } catch (e) { processed = srcCanvas; }
 
-    // --- Этап 5: распознавание ---
+    // 5. Распознавание
     rawTextDiv.textContent = '📦 Загружаю языковой пакет (rus+eng)...';
     let text = '';
     try {
@@ -210,9 +199,7 @@ async function captureAndRecognize() {
     } catch (e) {
         if (e.message === 'TIMEOUT' || e.message.includes('tesseract')) {
             rawTextDiv.textContent = '⚠ Русский пакет долго грузится, пробую английский...';
-            try {
-                text = await recognizeWithLang(srcCanvas, 'eng', 30000);
-            } catch (e2) {
+            try { text = await recognizeWithLang(srcCanvas, 'eng', 30000); } catch (e2) {
                 rawTextDiv.textContent = 'Ошибка распознавания (англ): ' + e2.message;
                 captureButton.disabled = false;
                 captureButton.textContent = '📸 Сфотографировать и распознать';
@@ -226,7 +213,7 @@ async function captureAndRecognize() {
         }
     }
 
-    // --- Этап 6: расчёт и показ в модалке ---
+    // 6. Расчёт
     rawTextDiv.textContent = '✅ Распознано. Открываю результаты...';
     const data = extractDataFromText(text, norm, season);
     openResultModal(data);
@@ -250,26 +237,57 @@ async function recognizeWithLang(image, lang, timeoutMs) {
     return result.data.text;
 }
 
-// ========== ИЗВЛЕЧЕНИЕ ДАННЫХ ==========
+// ========== ИЗВЛЕЧЕНИЕ ДАННЫХ И ВЫЧИСЛЕНИЯ ==========
 function extractDataFromText(rawText, norm, season) {
-    const пробегMatch = rawText.match(/пробег[:\s]*(\d+)/i);
+    // --- Ручные поля ---
+    const cityKm = parseFloat(cityKmInput.value) || 0;
+    const highwayKm = parseFloat(highwayKmInput.value) || 0;
+    const manualFuel = fuelAddedManual.value.trim();
+    const manualFuelValue = manualFuel !== '' ? parseFloat(manualFuel) || 0 : null;
+
+    // --- OCR ---
+    const пробегOcrMatch = rawText.match(/пробег[:\s]*(\d+)/i);
     const остатокВыездMatch = rawText.match(/остаток.?при.?выезде[:\s]*(\d+)/i);
     const остатокВозвратMatch = rawText.match(/остаток.?при.?возврате[:\s]*(\d+)/i);
     const заправленоOcrMatch = rawText.match(/заправлено[:\s]*(\d+)/i);
 
-    const пробег = пробегMatch ? parseInt(пробегMatch[1]) : 0;
     const остатокВыезд = остатокВыездMatch ? parseFloat(остатокВыездMatch[1]) : 0;
     const остатокВозврат = остатокВозвратMatch ? parseFloat(остатокВозвратMatch[1]) : 0;
 
-    let заправлено = 0;
-    const manualValue = fuelAddedManual.value.trim();
-    if (manualValue !== '') заправлено = parseFloat(manualValue) || 0;
-    else if (заправленоOcrMatch) заправлено = parseFloat(заправленоOcrMatch[1]);
+    // Пробег: сумма город+трасса, если введены, иначе OCR
+    let пробег;
+    let пробегИсточник = '';
+    if (cityKm > 0 || highwayKm > 0) {
+        пробег = cityKm + highwayKm;
+        пробегИсточник = `(город ${cityKm.toFixed(1)} + трасса ${highwayKm.toFixed(1)})`;
+    } else if (пробегOcrMatch) {
+        пробег = parseInt(пробегOcrMatch[1]);
+        пробегИсточник = '(из документа)';
+    } else {
+        пробег = 0;
+        пробегИсточник = '(не указан)';
+    }
 
+    // Заправка: ручная приоритетнее
+    let заправлено;
+    let заправкаИсточник = '';
+    if (manualFuelValue !== null) {
+        заправлено = manualFuelValue;
+        заправкаИсточник = '(вручную)';
+    } else if (заправленоOcrMatch) {
+        заправлено = parseFloat(заправленоOcrMatch[1]);
+        заправкаИсточник = '(из документа)';
+    } else {
+        заправлено = 0;
+        заправкаИсточник = '(0)';
+    }
+
+    // --- Вычисления с округлением до 2 знаков ---
     const расход = остатокВыезд + заправлено - остатокВозврат;
-    const расходНа100км = пробег > 0 ? ((расход / пробег) * 100).toFixed(1) : 0;
-    const нормативныйРасход = пробег > 0 ? ((пробег * norm) / 100).toFixed(1) : 0;
-    const отклонение = (расход - parseFloat(нормативныйРасход)).toFixed(1);
+    const расходFixed = расход.toFixed(2);
+    const расходНа100км = пробег > 0 ? ((расход / пробег) * 100).toFixed(2) : '0.00';
+    const нормативныйРасход = пробег > 0 ? ((пробег * norm) / 100).toFixed(2) : '0.00';
+    const отклонение = пробег > 0 ? (расход - parseFloat(нормативныйРасход)).toFixed(2) : '0.00';
     const сезонНазвание = season === 'winter' ? '❄️ зимняя' : '☀️ летняя';
 
     // Дата
@@ -292,10 +310,12 @@ function extractDataFromText(rawText, norm, season) {
 
     return {
         rawText,
-        пробег, остатокВыезд, заправлено, остатокВозврат,
-        расход, расходНа100км, нормативныйРасход, отклонение,
+        пробег, пробегИсточник,
+        остатокВыезд, заправлено, остатокВозврат, заправкаИсточник,
+        расход: расходFixed, расходНа100км, нормативныйРасход, отклонение,
         norm, season, сезонНазвание,
-        isoDate, dateStr
+        isoDate, dateStr,
+        cityKm, highwayKm
     };
 }
 
@@ -303,19 +323,18 @@ function extractDataFromText(rawText, norm, season) {
 function openResultModal(data) {
     currentResultData = data;
 
-    const manualNote = fuelAddedManual.value.trim() !== '' ? ' (вручную)' : (data.заправленоOcrMatch ? ' (из документа)' : ' (0)');
     modalCalculations.innerHTML = `
         <p><strong>📅 Дата:</strong> ${data.isoDate}</p>
-        <p><strong>📏 Пробег:</strong> ${data.пробег} км</p>
-        <p><strong>⛽ Остаток при выезде:</strong> ${data.остатокВыезд} л</p>
-        <p><strong>🛢️ Заправлено:</strong> ${data.заправлено} л ${manualNote}</p>
-        <p><strong>🏁 Остаток при возврате:</strong> ${data.остатокВозврат} л</p>
+        <p><strong>📏 Пробег общий:</strong> ${data.пробег.toFixed(2)} км ${data.пробегИсточник}</p>
+        <p><strong>⛽ Остаток при выезде:</strong> ${data.остатокВыезд.toFixed(2)} л</p>
+        <p><strong>🛢️ Заправлено:</strong> ${data.заправлено.toFixed(2)} л ${data.заправкаИсточник}</p>
+        <p><strong>🏁 Остаток при возврате:</strong> ${data.остатокВозврат.toFixed(2)} л</p>
         <hr>
         <p style="font-size: 1.3em; color: #d32f2f;"><strong>Фактический расход:</strong> ${data.расход} л</p>
         <p><strong>📉 Факт на 100 км:</strong> ${data.расходНа100км} л</p>
         <hr>
         <p><strong>📊 Норма расхода (${data.сезонНазвание}):</strong> ${data.norm} л/100км</p>
-        <p><strong>📌 Нормативный расход на ${data.пробег} км:</strong> ${data.нормативныйРасход} л</p>
+        <p><strong>📌 Нормативный расход на ${data.пробег.toFixed(2)} км:</strong> ${data.нормативныйРасход} л</p>
         <p><strong>📈 Отклонение от нормы:</strong> ${data.отклонение} л</p>
     `;
 
@@ -348,15 +367,17 @@ saveToHistoryBtn.addEventListener('click', () => {
     if (!currentResultData) return;
     const entry = {
         date: currentResultData.isoDate,
-        пробег: currentResultData.пробег,
-        остатокВыезд: currentResultData.остатокВыезд,
-        заправлено: currentResultData.заправлено,
-        остатокВозврат: currentResultData.остатокВозврат,
+        пробег: currentResultData.пробег.toFixed(2),
+        остатокВыезд: currentResultData.остатокВыезд.toFixed(2),
+        заправлено: currentResultData.заправлено.toFixed(2),
+        остатокВозврат: currentResultData.остатокВозврат.toFixed(2),
         расход: currentResultData.расход,
         расходНа100км: currentResultData.расходНа100км,
         норма: currentResultData.norm,
         сезон: currentResultData.season,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        cityKm: currentResultData.cityKm,
+        highwayKm: currentResultData.highwayKm,
     };
     saveToHistory(entry);
     alert('✅ Сохранено!');
@@ -372,9 +393,12 @@ function renderHistory() {
     history.sort((a, b) => b.timestamp - a.timestamp);
     let html = '<table><thead><tr><th>Дата</th><th>Пробег</th><th>Расход общ.</th><th>Расход/100км</th><th>Норма</th><th>Сезон</th><th></th></tr></thead><tbody>';
     history.forEach((entry, index) => {
+        const probegStr = (entry.cityKm || entry.highwayKm) 
+            ? `${entry.пробег} км (г${entry.cityKm?.toFixed(1)||0} + т${entry.highwayKm?.toFixed(1)||0})` 
+            : `${entry.пробег} км`;
         html += `<tr>
             <td>${entry.date}</td>
-            <td>${entry.пробег} км</td>
+            <td>${probegStr}</td>
             <td>${entry.расход} л</td>
             <td>${entry.расходНа100км} л</td>
             <td>${entry.норма} л</td>
@@ -420,6 +444,6 @@ window.addEventListener('click', (e) => {
     if (e.target === historyModal) historyModal.style.display = 'none';
 });
 
-// ========== СТАРТОВЫЕ ПРИВЯЗКИ ==========
+// ========== СТАРТ ==========
 startButton.addEventListener('click', startCamera);
 captureButton.addEventListener('click', captureAndRecognize);
