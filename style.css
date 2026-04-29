@@ -1,6 +1,4 @@
-* {
-    box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
     font-family: 'Segoe UI', Arial, sans-serif;
@@ -11,8 +9,7 @@ body {
 }
 
 .container {
-    background: #fff;
-    border-radius: 16px; padding: 16px;
+    background: #fff; border-radius: 16px; padding: 16px;
     max-width: 380px; width: 100%;
     box-shadow: 0 2px 12px rgba(0,0,0,0.08);
     margin: 10px; text-align: center; font-size: 14px;
