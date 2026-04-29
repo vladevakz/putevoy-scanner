@@ -1,4 +1,4 @@
-// Элементы
+// ===== ЭЛЕМЕНТЫ (основные и новые) =====
 const dateInput = document.getElementById('dateInput');
 const startOdometer = document.getElementById('startOdometer');
 const startOdometerHint = document.getElementById('startOdometerHint');
@@ -24,6 +24,17 @@ const closeHistoryModal = document.getElementById('closeHistoryModal');
 const historyList = document.getElementById('historyList');
 const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
+// Точки
+const pointsBtn = document.getElementById('pointsBtn');
+const pointsModal = document.getElementById('pointsModal');
+const closePointsModal = document.getElementById('closePointsModal');
+const pointDate = document.getElementById('pointDate');
+const pointCount = document.getElementById('pointCount');
+const addPointBtn = document.getElementById('addPointBtn');
+const pointsList = document.getElementById('pointsList');
+const pointsTotalDiv = document.getElementById('pointsTotal');
+const clearPointsBtn = document.getElementById('clearPointsBtn');
+
 let currentWeatherSeason = 'summer';
 
 // ===== НОРМЫ =====
@@ -47,13 +58,86 @@ function loadNormValues() {
 }
 [normCitySummer, normCityWinter, normHwySummer, normHwyWinter].forEach(i => i.addEventListener('input', saveNormValues));
 
-// ===== ИСТОРИЯ =====
+// ===== ИСТОРИЯ (топливо) =====
 function getHistory() {
     try { return JSON.parse(localStorage.getItem('putevoyHistory')) || []; } catch (e) { return []; }
 }
 function saveHistory(arr) {
     localStorage.setItem('putevoyHistory', JSON.stringify(arr));
 }
+
+// ===== ТОЧКИ =====
+function getPointsHistory() {
+    try { return JSON.parse(localStorage.getItem('pointsHistory')) || []; } catch (e) { return []; }
+}
+function savePointsHistory(arr) {
+    localStorage.setItem('pointsHistory', JSON.stringify(arr));
+}
+
+// Обновление таблицы точек
+function renderPoints() {
+    const points = getPointsHistory();
+    points.sort((a, b) => a.date.localeCompare(b.date) || b.timestamp - a.timestamp);
+    let total = 0;
+    let html = '<table><tr><th>Дата</th><th>Кол-во</th><th></th></tr>';
+    points.forEach((p, i) => {
+        total += p.count;
+        html += `<tr>
+            <td>${p.date}</td>
+            <td>${p.count}</td>
+            <td><button class="delete-point" data-index="${i}">🗑</button></td>
+        </tr>`;
+    });
+    html += '</table>';
+    pointsList.innerHTML = html;
+    pointsTotalDiv.textContent = `Всего точек: ${total}`;
+
+    // Удаление
+    document.querySelectorAll('.delete-point').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const idx = parseInt(e.target.getAttribute('data-index'));
+            deletePoint(idx);
+        });
+    });
+}
+
+function deletePoint(idx) {
+    const points = getPointsHistory();
+    points.sort((a, b) => a.date.localeCompare(b.date) || b.timestamp - a.timestamp);
+    points.splice(idx, 1);
+    savePointsHistory(points);
+    renderPoints();
+}
+
+addPointBtn.addEventListener('click', () => {
+    const date = pointDate.value;
+    const count = parseInt(pointCount.value);
+    if (!date) {
+        alert('Выберите дату');
+        return;
+    }
+    if (isNaN(count) || count < 0) {
+        alert('Введите корректное количество');
+        return;
+    }
+    const entry = {
+        date: date,
+        count: count,
+        timestamp: Date.now()
+    };
+    const points = getPointsHistory();
+    points.push(entry);
+    savePointsHistory(points);
+    pointCount.value = '';
+    renderPoints();
+});
+
+clearPointsBtn.addEventListener('click', () => {
+    if (confirm('Удалить все точки?')) {
+        savePointsHistory([]);
+        renderPoints();
+    }
+});
 
 // ===== ПОГОДА =====
 async function fetchWeather() {
@@ -88,7 +172,7 @@ async function updateWeather() {
     }
 }
 
-// ===== АВТОЗАПОЛНЕНИЕ НАЧАЛЬНОГО ПРОБЕГА И ВЫЕЗДА =====
+// ===== АВТОЗАПОЛНЕНИЕ ПРОБЕГА И ВЫЕЗДА =====
 function setStartOdometerFromHistory() {
     const history = getHistory();
     if (!history.length) {
@@ -151,15 +235,15 @@ function updateLiveResults() {
     const normTotal = normCityL + normHwyL;
     const avgNorm = dayProbeg > 0 ? (normTotal / dayProbeg) * 100 : 0;
 
-    const calcReturn = fuelStart + fuelAddedVal - normTotal; // расчётный возврат
-    const factFuel = normTotal; // фактический расход равен нормативному
+    const calcReturn = fuelStart + fuelAddedVal - normTotal;
+    const factFuel = normTotal;
     const fact100 = dayProbeg > 0 ? (factFuel / dayProbeg) * 100 : 0;
 
     liveResults.innerHTML = `
-        <p style="margin:0 0 4px;">🚩 <b>Нач. пробег:</b> ${odoStart.toFixed(1)} км → 🏁 <b>Конечный:</b> ${odoEnd.toFixed(1)} км (за день: ${dayProbeg.toFixed(1)} км)</p>
+        <p style="margin:0 0 4px;">🚩 <b>Пробег:</b> ${odoStart.toFixed(1)} → ${odoEnd.toFixed(1)} км (за день: ${dayProbeg.toFixed(1)} км)</p>
         <p style="margin:0 0 4px;">⛽ <b>Выезд:</b> ${fuelStart.toFixed(2)} л | 🛢️ <b>Заправ:</b> ${fuelAddedVal.toFixed(2)} л | 🏁 <b>Возврат:</b> ${calcReturn.toFixed(2)} л</p>
         <p style="margin:0 0 4px;">${season === 'winter' ? '❄️' : '☀️'} Нормы: г.${norms.city.toFixed(1)} / т.${norms.hwy.toFixed(1)}</p>
-        <p style="margin:0 0 4px;">📊 Норм. расход: город ${normCityL.toFixed(2)} + трасса ${normHwyL.toFixed(2)} = <b>${normTotal.toFixed(2)} л</b> (ср. ${avgNorm.toFixed(2)} л/100км)</p>
+        <p style="margin:0 0 4px;">📊 Норм. расход: город ${normCityL.toFixed(2)} + трасса ${normHwyL.toFixed(2)} = <b>${normTotal.toFixed(2)} л</b> (ср. ${avgNorm.toFixed(2)})</p>
         <p style="margin:0 0 4px;">🛞 <b>Факт. расход:</b> ${factFuel.toFixed(2)} л (${fact100.toFixed(2)} л/100км)</p>
     `;
 
@@ -167,26 +251,23 @@ function updateLiveResults() {
 }
 
 function updateHints() {
-    // Подсказка для начального пробега
-    const odoVal = parseFloat(startOdometer.value);
     const history = getHistory();
     if (history.length) {
         history.sort((a, b) => b.timestamp - a.timestamp);
-        const lastEnd = parseFloat(history[0].конечныйПробег);
+        const last = history[0];
+
+        const odoVal = parseFloat(startOdometer.value);
+        const lastEnd = parseFloat(last.конечныйПробег);
         if (!isNaN(lastEnd) && !isNaN(odoVal) && Math.abs(lastEnd - odoVal) < 0.01) {
-            startOdometerHint.textContent = `из ${history[0].date}`;
+            startOdometerHint.textContent = `из ${last.date}`;
         } else if (!isNaN(odoVal)) {
             startOdometerHint.textContent = 'вручную';
         }
-    }
 
-    // Подсказка для остатка топлива
-    const fuelVal = parseFloat(startFuel.value);
-    if (history.length) {
-        history.sort((a, b) => b.timestamp - a.timestamp);
-        const lastReturn = parseFloat(history[0].остатокВозврат);
+        const fuelVal = parseFloat(startFuel.value);
+        const lastReturn = parseFloat(last.остатокВозврат);
         if (!isNaN(lastReturn) && !isNaN(fuelVal) && Math.abs(lastReturn - fuelVal) < 0.01) {
-            startFuelHint.textContent = `из ${history[0].date}`;
+            startFuelHint.textContent = `из ${last.date}`;
         } else if (!isNaN(fuelVal)) {
             startFuelHint.textContent = 'вручную';
         }
@@ -229,7 +310,7 @@ saveBtn.addEventListener('click', () => {
     updateLiveResults();
 });
 
-// ===== МОДАЛЬНОЕ ОКНО ИСТОРИИ =====
+// ===== МОДАЛЬНЫЕ ОКНА ИСТОРИИ И ТОЧЕК =====
 function renderHistory() {
     const history = getHistory();
     if (!history.length) { historyList.innerHTML = '<p>История пуста.</p>'; return; }
@@ -246,8 +327,8 @@ function renderHistory() {
     });
     html += '</table>';
     historyList.innerHTML = html;
-    document.querySelectorAll('.delete-entry').forEach(b => {
-        b.addEventListener('click', (ev) => deleteHistoryEntry(parseInt(ev.target.dataset.index)));
+    document.querySelectorAll('.delete-entry').forEach(btn => {
+        btn.addEventListener('click', (e) => deleteHistoryEntry(parseInt(e.target.getAttribute('data-index'))));
     });
 }
 
@@ -262,10 +343,11 @@ function deleteHistoryEntry(idx) {
     updateLiveResults();
 }
 
+// Обработчики модальных окон
 historyBtn.addEventListener('click', () => { renderHistory(); historyModal.style.display = 'flex'; });
 closeHistoryModal.addEventListener('click', () => historyModal.style.display = 'none');
 clearHistoryBtn.addEventListener('click', () => {
-    if (confirm('Удалить всю историю?')) {
+    if (confirm('Удалить всю историю расчётов?')) {
         localStorage.removeItem('putevoyHistory');
         renderHistory();
         setStartOdometerFromHistory();
@@ -273,7 +355,18 @@ clearHistoryBtn.addEventListener('click', () => {
         updateLiveResults();
     }
 });
-window.addEventListener('click', e => { if (e.target === historyModal) historyModal.style.display = 'none'; });
+
+pointsBtn.addEventListener('click', () => {
+    pointDate.value = new Date().toISOString().split('T')[0];
+    renderPoints();
+    pointsModal.style.display = 'flex';
+});
+closePointsModal.addEventListener('click', () => pointsModal.style.display = 'none');
+
+window.addEventListener('click', (e) => {
+    if (e.target === historyModal) historyModal.style.display = 'none';
+    if (e.target === pointsModal) pointsModal.style.display = 'none';
+});
 
 // ===== СЛУШАТЕЛИ ПОЛЕЙ =====
 document.querySelectorAll('#startOdometer, #startFuel, #cityKm, #highwayKm, #fuelAdded, #dateInput').forEach(input => {
