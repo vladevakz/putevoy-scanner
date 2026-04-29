@@ -1,21 +1,23 @@
-// ========== ЭЛЕМЕНТЫ ИНТЕРФЕЙСА ==========
+// ========== ЭЛЕМЕНТЫ ==========
 const video = document.getElementById('video');
 const captureButton = document.getElementById('captureButton');
 const startButton = document.getElementById('startButton');
 const rawTextDiv = document.getElementById('rawText');
 const weatherInfoDiv = document.getElementById('weatherInfo');
 
-// Поля ввода
 const startFuelInput = document.getElementById('startFuel');
 const startFuelHint = document.getElementById('startFuelHint');
+const endFuelInput = document.getElementById('endFuel');
 const cityKmInput = document.getElementById('cityKm');
 const highwayKmInput = document.getElementById('highwayKm');
 const fuelAddedManual = document.getElementById('fuelAddedManual');
-const normSummerInput = document.getElementById('normSummer');
-const normWinterInput = document.getElementById('normWinter');
+
+const normCitySummerInput = document.getElementById('normCitySummer');
+const normCityWinterInput = document.getElementById('normCityWinter');
+const normHwySummerInput = document.getElementById('normHwySummer');
+const normHwyWinterInput = document.getElementById('normHwyWinter');
 const seasonRadios = document.getElementsByName('season');
 
-// Модальные окна
 const resultModal = document.getElementById('resultModal');
 const closeResultModal = document.getElementById('closeResultModal');
 const closeResultBtn = document.getElementById('closeResultBtn');
@@ -29,204 +31,152 @@ const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
 let currentResultData = null;
 
-// ========== БЕЗОПАСНАЯ РАБОТА С LOCALSTORAGE ==========
+// ========== LOCALSTORAGE ИСТОРИЯ ==========
 function getHistory() {
     try {
         const raw = localStorage.getItem('putevoyHistory');
         if (!raw) return [];
         const data = JSON.parse(raw);
-        // Фильтруем только валидные записи (объекты с датой и числовыми полями)
-        return Array.isArray(data) ? data.filter(entry => {
-            return entry && typeof entry.date === 'string' && !isNaN(parseFloat(entry.остатокВозврат));
-        }) : [];
+        return Array.isArray(data) ? data.filter(e => e && typeof e.date === 'string' && !isNaN(parseFloat(e.остатокВозврат))) : [];
     } catch (e) {
-        console.warn('Ошибка чтения истории, сбрасываем', e);
         localStorage.removeItem('putevoyHistory');
         return [];
     }
 }
 
-function saveHistory(historyArray) {
-    try {
-        localStorage.setItem('putevoyHistory', JSON.stringify(historyArray));
-    } catch (e) {
-        alert('Не удалось сохранить историю: возможно, переполнено хранилище. Попробуйте удалить старые записи.');
-        console.error(e);
-    }
+function saveHistory(arr) {
+    try { localStorage.setItem('putevoyHistory', JSON.stringify(arr)); } catch (e) { alert('Хранилище переполнено'); }
 }
 
-// ========== ВОССТАНОВЛЕНИЕ ПРИ ЗАГРУЗКЕ ==========
+// ========== ЗАГРУЗКА НОРМ И ОСТАТКА ==========
 window.addEventListener('DOMContentLoaded', () => {
-    // Нормы
-    try {
-        const savedSummer = localStorage.getItem('normSummer');
-        const savedWinter = localStorage.getItem('normWinter');
-        if (savedSummer !== null) normSummerInput.value = savedSummer;
-        if (savedWinter !== null) normWinterInput.value = savedWinter;
-    } catch (e) {}
+    // Восстановление норм
+    const keys = ['normCitySummer','normCityWinter','normHwySummer','normHwyWinter'];
+    const inputs = [normCitySummerInput, normCityWinterInput, normHwySummerInput, normHwyWinterInput];
+    keys.forEach((key, i) => {
+        const saved = localStorage.getItem(key);
+        if (saved !== null) inputs[i].value = saved;
+    });
 
-    // Остаток при выезде
+    // Остаток при выезде из истории
     safeUpdateStartFuelFromHistory();
     updateStartFuelHint();
 });
 
-normSummerInput.addEventListener('input', () => {
-    try { localStorage.setItem('normSummer', normSummerInput.value); } catch (e) {}
-});
-normWinterInput.addEventListener('input', () => {
-    try { localStorage.setItem('normWinter', normWinterInput.value); } catch (e) {}
+// Автосохранение норм при изменении
+[normCitySummerInput, normCityWinterInput, normHwySummerInput, normHwyWinterInput].forEach((inp, i) => {
+    const keys = ['normCitySummer','normCityWinter','normHwySummer','normHwyWinter'];
+    inp.addEventListener('input', () => {
+        try { localStorage.setItem(keys[i], inp.value); } catch (e) {}
+    });
 });
 
 startFuelInput.addEventListener('input', updateStartFuelHint);
 
 function safeUpdateStartFuelFromHistory() {
-    try {
-        const history = getHistory();
-        if (history.length === 0) {
-            startFuelInput.value = '';
-            return;
-        }
-        // Последняя запись
-        history.sort((a, b) => b.timestamp - a.timestamp);
-        const last = history[0];
-        const returnFuel = parseFloat(last.остатокВозврат);
-        if (!isNaN(returnFuel)) {
-            startFuelInput.value = returnFuel.toFixed(2);
-        } else {
-            startFuelInput.value = '';
-        }
-    } catch (e) {
-        startFuelInput.value = '';
-    }
+    const history = getHistory();
+    if (history.length === 0) { startFuelInput.value = ''; return; }
+    history.sort((a,b) => b.timestamp - a.timestamp);
+    const last = history[0];
+    const val = parseFloat(last.остатокВозврат);
+    startFuelInput.value = !isNaN(val) ? val.toFixed(2) : '';
 }
 
 function updateStartFuelHint() {
-    const manualValue = startFuelInput.value.trim();
-    if (manualValue !== '') {
-        const val = parseFloat(manualValue);
-        if (isNaN(val)) {
-            startFuelHint.textContent = 'Введите число';
-            return;
+    const manual = startFuelInput.value.trim();
+    if (manual !== '') {
+        const val = parseFloat(manual);
+        if (isNaN(val)) { startFuelHint.textContent = 'Введите число'; return; }
+        const history = getHistory();
+        if (history.length) {
+            history.sort((a,b) => b.timestamp - a.timestamp);
+            const last = history[0];
+            if (Math.abs(parseFloat(last.остатокВозврат) - val) < 0.01)
+                { startFuelHint.textContent = `Из истории (${last.date})`; return; }
         }
-        // Проверим, совпадает ли с историческим значением
-        try {
-            const history = getHistory();
-            if (history.length > 0) {
-                history.sort((a, b) => b.timestamp - a.timestamp);
-                const last = history[0];
-                const lastReturn = parseFloat(last.остатокВозврат);
-                if (!isNaN(lastReturn) && Math.abs(lastReturn - val) < 0.01) {
-                    startFuelHint.textContent = `Из истории (${last.date})`;
-                    return;
-                }
-            }
-        } catch (e) {}
         startFuelHint.textContent = 'Вручную';
     } else {
-        // Поле пустое – посмотрим, что подставится при расчёте
-        try {
-            const history = getHistory();
-            if (history.length > 0) {
-                history.sort((a, b) => b.timestamp - a.timestamp);
-                const last = history[0];
-                const lastReturn = parseFloat(last.остатокВозврат);
-                if (!isNaN(lastReturn) && lastReturn > 0) {
-                    startFuelHint.textContent = `Будет взято из истории (${last.date})`;
-                    return;
-                }
-            }
-        } catch (e) {}
+        const history = getHistory();
+        if (history.length) {
+            history.sort((a,b) => b.timestamp - a.timestamp);
+            const last = history[0];
+            const lastVal = parseFloat(last.остатокВозврат);
+            if (!isNaN(lastVal) && lastVal > 0)
+                { startFuelHint.textContent = `Будет взято из истории (${last.date})`; return; }
+        }
         startFuelHint.textContent = 'Заполнится из истории';
     }
 }
 
-// ========== ЗАПУСК КАМЕРЫ ==========
+// ========== КАМЕРА ==========
 async function startCamera() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment' }
-        });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         video.srcObject = stream;
-        await new Promise(res => { video.onloadedmetadata = res; });
+        await new Promise(r => { video.onloadedmetadata = r; });
         captureButton.disabled = false;
-    } catch (err) {
-        alert('Не удалось запустить камеру: ' + err.message);
-    }
+    } catch (err) { alert('Ошибка камеры: ' + err.message); }
 }
 
-// ========== ПОГОДА (с таймаутом) ==========
+// ========== ПОГОДА ==========
 function getSelectedSeasonMode() {
-    for (const radio of seasonRadios) {
-        if (radio.checked) return radio.value;
-    }
+    for (const radio of seasonRadios) if (radio.checked) return radio.value;
     return 'auto';
 }
 
-function fetchWeatherWithTimeout(timeoutMs = 8000) {
+function fetchWeatherWithTimeout(ms=8000) {
     return new Promise((resolve, reject) => {
         let settled = false;
-        const timer = setTimeout(() => {
-            if (!settled) {
-                settled = true;
-                reject(new Error('Превышено время ожидания геолокации'));
-            }
-        }, timeoutMs);
-
+        const timer = setTimeout(() => { if (!settled) { settled = true; reject(new Error('Таймаут геолокации')); } }, ms);
         fetchWeatherByLocation()
-            .then(temp => {
-                if (!settled) { settled = true; clearTimeout(timer); resolve(temp); }
-            })
-            .catch(err => {
-                if (!settled) { settled = true; clearTimeout(timer); reject(err); }
-            });
+            .then(t => { if (!settled) { settled = true; clearTimeout(timer); resolve(t); } })
+            .catch(err => { if (!settled) { settled = true; clearTimeout(timer); reject(err); } });
     });
 }
 
 function fetchWeatherByLocation() {
     return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-            reject(new Error('Геолокация не поддерживается'));
-            return;
-        }
+        if (!navigator.geolocation) return reject(new Error('Нет геолокации'));
         navigator.geolocation.getCurrentPosition(
-            async (pos) => {
+            async pos => {
                 try {
-                    const resp = await fetch(
-                        `https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&current_weather=true`
-                    );
-                    const data = await resp.json();
+                    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&current_weather=true`);
+                    const data = await res.json();
                     resolve(data.current_weather.temperature);
-                } catch (err) {
-                    reject(new Error('Ошибка получения погоды: ' + err.message));
-                }
+                } catch (e) { reject(e); }
             },
-            (err) => reject(new Error('Доступ к геолокации запрещён: ' + err.message)),
+            e => reject(e),
             { timeout: 5000 }
         );
     });
 }
 
-async function updateWeatherAndDetermineNorm() {
+async function getSeasonAndNorms() {
     const mode = getSelectedSeasonMode();
     weatherInfoDiv.textContent = '';
 
+    let season;
     if (mode !== 'auto') {
+        season = mode;
         weatherInfoDiv.textContent = `📌 Сезон: ${mode === 'winter' ? 'Зима (вручную)' : 'Лето (вручную)'}`;
-        return mode;
+    } else {
+        try {
+            weatherInfoDiv.textContent = '🌍 Определяю погоду...';
+            const temp = await fetchWeatherWithTimeout(8000);
+            season = temp < 0 ? 'winter' : 'summer';
+            weatherInfoDiv.textContent = `🌡️ Температура: ${temp}°C. Режим: ${season === 'winter' ? '❄️ Зима' : '☀️ Лето'}`;
+        } catch (err) {
+            weatherInfoDiv.textContent = '⚠️ Погода недоступна, взято лето';
+            season = 'summer';
+        }
     }
 
-    try {
-        weatherInfoDiv.textContent = '🌍 Определяем местоположение и погоду...';
-        const temp = await fetchWeatherWithTimeout(8000);
-        weatherInfoDiv.textContent = `🌡️ Температура: ${temp}°C. Режим: ${temp < 0 ? '❄️ Зима' : '☀️ Лето'}`;
-        return temp < 0 ? 'winter' : 'summer';
-    } catch (err) {
-        weatherInfoDiv.textContent = '⚠️ Погода недоступна, используется летняя норма';
-        return 'summer';
-    }
+    const normCity = season === 'winter' ? parseFloat(normCityWinterInput.value) || 13 : parseFloat(normCitySummerInput.value) || 11;
+    const normHwy = season === 'winter' ? parseFloat(normHwyWinterInput.value) || 11 : parseFloat(normHwySummerInput.value) || 9;
+    return { season, normCity, normHwy };
 }
 
-// ========== ПРЕДОБРАБОТКА ИЗОБРАЖЕНИЯ ==========
+// ========== ПРЕДОБРАБОТКА ==========
 function preprocessCanvas(source) {
     const scale = 1500 / source.width;
     const canvas = document.createElement('canvas');
@@ -234,68 +184,55 @@ function preprocessCanvas(source) {
     canvas.height = Math.floor(source.height * scale);
     const ctx = canvas.getContext('2d');
     ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imgData.data;
     for (let i = 0; i < data.length; i += 4) {
-        const gray = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        const gray = (data[i] + data[i+1] + data[i+2]) / 3;
         const val = gray > 127 ? 255 : 0;
-        data[i] = data[i + 1] = data[i + 2] = val;
+        data[i] = data[i+1] = data[i+2] = val;
     }
-    ctx.putImageData(imageData, 0, 0);
+    ctx.putImageData(imgData, 0, 0);
     return canvas;
 }
 
 // ========== РАСПОЗНАВАНИЕ ==========
 async function captureAndRecognize() {
-    // Защита от двойного нажатия
     if (captureButton.disabled) return;
     captureButton.disabled = true;
     captureButton.textContent = '⏳ Идёт процесс...';
 
     try {
-        // 1. Погода
+        // Сезон и нормы
         rawTextDiv.textContent = '🌤 Определяю погоду...';
-        const season = await updateWeatherAndDetermineNorm();
-        const norm = season === 'winter' ? parseFloat(normWinterInput.value) || 12 : parseFloat(normSummerInput.value) || 10;
+        const { season, normCity, normHwy } = await getSeasonAndNorms();
 
-        // 2. Камера
-        if (video.videoWidth === 0 || video.videoHeight === 0) {
-            throw new Error('Камера не передаёт изображение. Перезапустите камеру.');
-        }
+        if (video.videoWidth === 0 || video.videoHeight === 0) throw new Error('Камера не готова');
 
-        // 3. Захват кадра
         rawTextDiv.textContent = '⏱ Захват кадра...';
         const srcCanvas = document.createElement('canvas');
         srcCanvas.width = video.videoWidth;
         srcCanvas.height = video.videoHeight;
         srcCanvas.getContext('2d').drawImage(video, 0, 0);
-        rawTextDiv.textContent = '✅ Кадр захвачен. Улучшаю качество...';
+        rawTextDiv.textContent = '✅ Кадр захвачен. Улучшаю...';
 
-        // 4. Предобработка
         let processed;
         try { processed = preprocessCanvas(srcCanvas); } catch (e) { processed = srcCanvas; }
 
-        // 5. Распознавание
         rawTextDiv.textContent = '📦 Загружаю языковой пакет...';
         let text;
         try {
             text = await recognizeWithLang(processed, 'rus+eng', 45000);
         } catch (e) {
             if (e.message === 'TIMEOUT') {
-                rawTextDiv.textContent = '⚠ Русский пакет не загрузился, пробую английский...';
+                rawTextDiv.textContent = '⚠️ Русский не загрузился, английский...';
                 text = await recognizeWithLang(srcCanvas, 'eng', 30000);
-            } else {
-                throw e;
-            }
+            } else throw e;
         }
 
-        rawTextDiv.textContent = '✅ Распознано. Открываю результаты...';
-        const data = extractDataFromText(text, norm, season);
+        rawTextDiv.textContent = '✅ Распознано. Рассчитываю...';
+        const data = extractData(text, season, normCity, normHwy);
         openResultModal(data);
-
     } catch (err) {
-        console.error(err);
         rawTextDiv.textContent = 'Ошибка: ' + err.message;
     } finally {
         captureButton.disabled = false;
@@ -305,10 +242,7 @@ async function captureAndRecognize() {
 
 async function recognizeWithLang(image, lang, timeoutMs) {
     const worker = await Tesseract.createWorker(lang);
-    await worker.setParameters({
-        tessedit_pageseg_mode: '6',
-        preserve_interword_spaces: '1',
-    });
+    await worker.setParameters({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' });
     rawTextDiv.textContent = `📦 Язык ${lang} загружен, распознаю...`;
     const result = await Promise.race([
         worker.recognize(image),
@@ -318,75 +252,87 @@ async function recognizeWithLang(image, lang, timeoutMs) {
     return result.data.text;
 }
 
-// ========== ИЗВЛЕЧЕНИЕ ДАННЫХ И ВЫЧИСЛЕНИЯ ==========
-function getLastHistoryReturnFuel() {
+// ========== ИЗВЛЕЧЕНИЕ ДАННЫХ И РАСЧЁТ ==========
+function getLastReturnFromHistory() {
     const history = getHistory();
-    if (history.length === 0) return { value: 0, source: 'нет истории' };
-    history.sort((a, b) => b.timestamp - a.timestamp);
+    if (!history.length) return { value: 0, source: 'нет истории' };
+    history.sort((a,b) => b.timestamp - a.timestamp);
     const last = history[0];
     const val = parseFloat(last.остатокВозврат);
-    if (!isNaN(val)) {
-        return { value: val, source: `из истории (${last.date})` };
-    }
-    return { value: 0, source: 'история повреждена' };
+    return !isNaN(val) ? { value: val, source: `из истории (${last.date})` } : { value: 0, source: 'повреждена' };
 }
 
-function extractDataFromText(rawText, norm, season) {
-    // --- Остаток при выезде ---
-    const startFuelManual = startFuelInput.value.trim();
-    let остатокВыезд, startFuelSource;
-
-    if (startFuelManual !== '') {
-        остатокВыезд = parseFloat(startFuelManual) || 0;
-        startFuelSource = '(вручную)';
+function extractData(rawText, season, normCity, normHwy) {
+    // Остаток при выезде
+    const startMan = startFuelInput.value.trim();
+    let startVal, startSrc;
+    if (startMan !== '') {
+        startVal = parseFloat(startMan) || 0;
+        startSrc = '(вручную)';
     } else {
-        const ocrMatch = rawText.match(/остаток.?при.?выезде[:\s]*(\d+)/i);
-        if (ocrMatch) {
-            остатокВыезд = parseFloat(ocrMatch[1]);
-            startFuelSource = '(из документа)';
+        const ocr = rawText.match(/остаток.?при.?выезде[:\s]*(\d+)/i);
+        if (ocr) {
+            startVal = parseFloat(ocr[1]);
+            startSrc = '(из документа)';
         } else {
-            const hist = getLastHistoryReturnFuel();
-            остатокВыезд = hist.value;
-            startFuelSource = hist.source;
+            const hist = getLastReturnFromHistory();
+            startVal = hist.value;
+            startSrc = hist.source;
         }
     }
 
-    // --- Пробег ---
-    const cityKm = parseFloat(cityKmInput.value) || 0;
-    const highwayKm = parseFloat(highwayKmInput.value) || 0;
-    let пробег, пробегИсточник;
-    if (cityKm > 0 || highwayKm > 0) {
-        пробег = cityKm + highwayKm;
-        пробегИсточник = `(город ${cityKm.toFixed(1)} + трасса ${highwayKm.toFixed(1)})`;
+    // Остаток при возврате
+    const endMan = endFuelInput.value.trim();
+    let endVal, endSrc;
+    if (endMan !== '') {
+        endVal = parseFloat(endMan) || 0;
+        endSrc = '(вручную)';
     } else {
-        const ocrПробег = rawText.match(/пробег[:\s]*(\d+)/i);
-        пробег = ocrПробег ? parseInt(ocrПробег[1]) : 0;
-        пробегИсточник = ocrПробег ? '(из документа)' : '(не указан)';
+        const ocr = rawText.match(/остаток.?при.?возврате[:\s]*(\d+)/i);
+        if (ocr) {
+            endVal = parseFloat(ocr[1]);
+            endSrc = '(из документа)';
+        } else {
+            endVal = 0;
+            endSrc = '(не указан)';
+        }
     }
 
-    // --- Заправка ---
-    const manualFuel = fuelAddedManual.value.trim();
-    let заправлено, заправкаИсточник;
-    if (manualFuel !== '') {
-        заправлено = parseFloat(manualFuel) || 0;
-        заправкаИсточник = '(вручную)';
+    // Пробег
+    const city = parseFloat(cityKmInput.value) || 0;
+    const hwy = parseFloat(highwayKmInput.value) || 0;
+    let probeg, probegSrc;
+    if (city > 0 || hwy > 0) {
+        probeg = city + hwy;
+        probegSrc = `(город ${city.toFixed(1)} + трасса ${hwy.toFixed(1)})`;
     } else {
-        const ocrFuel = rawText.match(/заправлено[:\s]*(\d+)/i);
-        заправлено = ocrFuel ? parseFloat(ocrFuel[1]) : 0;
-        заправкаИсточник = ocrFuel ? '(из документа)' : '(0)';
+        const ocrP = rawText.match(/пробег[:\s]*(\d+)/i);
+        probeg = ocrP ? parseInt(ocrP[1]) : 0;
+        probegSrc = ocrP ? '(из документа)' : '(не указан)';
     }
 
-    // --- Остаток при возврате ---
-    const ocrReturn = rawText.match(/остаток.?при.?возврате[:\s]*(\d+)/i);
-    const остатокВозврат = ocrReturn ? parseFloat(ocrReturn[1]) : 0;
+    // Заправка
+    const fuelMan = fuelAddedManual.value.trim();
+    let fuelVal, fuelSrc;
+    if (fuelMan !== '') {
+        fuelVal = parseFloat(fuelMan) || 0;
+        fuelSrc = '(вручную)';
+    } else {
+        const ocrF = rawText.match(/заправлено[:\s]*(\d+)/i);
+        fuelVal = ocrF ? parseFloat(ocrF[1]) : 0;
+        fuelSrc = ocrF ? '(из документа)' : '(0)';
+    }
 
-    // --- Расчёт ---
-    const расход = остатокВыезд + заправлено - остатокВозврат;
-    const расходFixed = расход.toFixed(2);
-    const расходНа100км = пробег > 0 ? ((расход / пробег) * 100).toFixed(2) : '0.00';
-    const нормативныйРасход = пробег > 0 ? ((пробег * norm) / 100).toFixed(2) : '0.00';
-    const отклонение = пробег > 0 ? (расход - parseFloat(нормативныйРасход)).toFixed(2) : '0.00';
-    const сезонНазвание = season === 'winter' ? '❄️ зимняя' : '☀️ летняя';
+    // Нормативный расход
+    const normCityTotal = (city * normCity) / 100;
+    const normHwyTotal = (hwy * normHwy) / 100;
+    const normTotal = normCityTotal + normHwyTotal;
+    const avgNorm = probeg > 0 ? (normTotal / probeg) * 100 : 0;
+
+    // Фактический расход
+    const factFuel = startVal + fuelVal - endVal;
+    const fact100 = probeg > 0 ? (factFuel / probeg) * 100 : 0;
+    const deviation = factFuel - normTotal;
 
     // Дата
     const dateMatch = rawText.match(/(\d{2}[.\/-]\d{2}[.\/-]\d{2,4})/);
@@ -394,23 +340,25 @@ function extractDataFromText(rawText, norm, season) {
     if (dateMatch) {
         const parts = dateMatch[1].split(/[.\/-]/);
         if (parts.length === 3) {
-            const day = parts[0].padStart(2, '0');
-            const month = parts[1].padStart(2, '0');
-            const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
-            isoDate = `${year}-${month}-${day}`;
+            const d = parts[0].padStart(2,'0'), m = parts[1].padStart(2,'0'), y = parts[2].length===2?'20'+parts[2]:parts[2];
+            isoDate = `${y}-${m}-${d}`;
         }
     }
 
     return {
-        rawText,
-        остатокВыезд, startFuelSource,
-        пробег, пробегИсточник,
-        заправлено, заправкаИсточник,
-        остатокВозврат,
-        расход: расходFixed, расходНа100км, нормативныйРасход, отклонение,
-        norm, season, сезонНазвание,
-        isoDate,
-        cityKm, highwayKm
+        isoDate, season,
+        startVal, startSrc,
+        endVal, endSrc,
+        city, hwy, probeg, probegSrc,
+        fuelVal, fuelSrc,
+        normCity, normHwy,
+        normCityTotal: normCityTotal.toFixed(2),
+        normHwyTotal: normHwyTotal.toFixed(2),
+        normTotal: normTotal.toFixed(2),
+        avgNorm: avgNorm.toFixed(2),
+        factFuel: factFuel.toFixed(2),
+        fact100: fact100.toFixed(2),
+        deviation: deviation.toFixed(2)
     };
 }
 
@@ -418,125 +366,110 @@ function extractDataFromText(rawText, norm, season) {
 function openResultModal(data) {
     currentResultData = data;
 
-    modalCalculations.innerHTML = `
-        <p><strong>📅 Дата:</strong> ${data.isoDate}</p>
-        <p><strong>⛽ Остаток при выезде:</strong> ${data.остатокВыезд.toFixed(2)} л ${data.startFuelSource}</p>
-        <p><strong>📏 Пробег общий:</strong> ${data.пробег.toFixed(2)} км ${data.пробегИсточник}</p>
-        <p><strong>🛢️ Заправлено:</strong> ${data.заправлено.toFixed(2)} л ${data.заправкаИсточник}</p>
-        <p><strong>🏁 Остаток при возврате:</strong> ${data.остатокВозврат.toFixed(2)} л</p>
+    const seasonEmoji = data.season === 'winter' ? '❄️' : '☀️';
+    let html = `
+        <p><strong>📅 Дата:</strong> ${data.isoDate} ${seasonEmoji}</p>
+        <p><strong>⛽ Остаток при выезде:</strong> ${data.startVal.toFixed(2)} л ${data.startSrc}</p>
+        <p><strong>🛢️ Заправлено:</strong> ${data.fuelVal.toFixed(2)} л ${data.fuelSrc}</p>
+        <p><strong>🏁 Остаток при возврате:</strong> ${data.endVal.toFixed(2)} л ${data.endSrc}</p>
+        <p><strong>📏 Пробег общий:</strong> ${data.probeg.toFixed(2)} км ${data.probegSrc}</p>
         <hr>
-        <p style="font-size: 1.3em; color: #d32f2f;"><strong>Фактический расход:</strong> ${data.расход} л</p>
-        <p><strong>📉 Факт на 100 км:</strong> ${data.расходНа100км} л</p>
+        <p><strong>🏙️ Нормативный расход город:</strong> ${data.normCityTotal} л (норма ${data.normCity} л/100км)</p>
+        <p><strong>🛣️ Нормативный расход трасса:</strong> ${data.normHwyTotal} л (норма ${data.normHwy} л/100км)</p>
+        <p><strong>📊 Нормативный расход общий:</strong> ${data.normTotal} л</p>
+        <p><strong>📐 Средняя норма:</strong> ${data.avgNorm} л/100км</p>
         <hr>
-        <p><strong>📊 Норма расхода (${data.сезонНазвание}):</strong> ${data.norm} л/100км</p>
-        <p><strong>📌 Нормативный расход на ${data.пробег.toFixed(2)} км:</strong> ${data.нормативныйРасход} л</p>
-        <p><strong>📈 Отклонение от нормы:</strong> ${data.отклонение} л</p>
+        <p style="font-size:1.3em;color:#d32f2f;"><strong>🛞 Фактический расход:</strong> ${data.factFuel} л (${data.fact100} л/100км)</p>
+        <p><strong>📈 Отклонение от нормы:</strong> ${data.deviation} л</p>
     `;
-
+    modalCalculations.innerHTML = html;
     resultModal.style.display = 'flex';
 }
 
-function closeResultModalHandler() {
-    resultModal.style.display = 'none';
-    currentResultData = null;
-}
+function closeResultModalHandler() { resultModal.style.display = 'none'; currentResultData = null; }
 closeResultModal.addEventListener('click', closeResultModalHandler);
 closeResultBtn.addEventListener('click', closeResultModalHandler);
-window.addEventListener('click', (e) => {
-    if (e.target === resultModal) closeResultModalHandler();
-});
+window.addEventListener('click', e => { if (e.target === resultModal) closeResultModalHandler(); });
 
 // ========== СОХРАНЕНИЕ В ИСТОРИЮ ==========
 saveToHistoryBtn.addEventListener('click', () => {
     if (!currentResultData) return;
+    const d = currentResultData;
 
     const entry = {
-        date: currentResultData.isoDate,
-        остатокВыезд: currentResultData.остатокВыезд.toFixed(2),
-        пробег: currentResultData.пробег.toFixed(2),
-        заправлено: currentResultData.заправлено.toFixed(2),
-        остатокВозврат: currentResultData.остатокВозврат.toFixed(2),
-        расход: currentResultData.расход,
-        расходНа100км: currentResultData.расходНа100км,
-        норма: currentResultData.norm,
-        сезон: currentResultData.season,
+        date: d.isoDate,
+        остатокВыезд: d.startVal.toFixed(2),
+        остатокВозврат: d.endVal.toFixed(2),
+        заправлено: d.fuelVal.toFixed(2),
+        пробег: d.probeg.toFixed(2),
+        normCity: d.normCity,
+        normHwy: d.normHwy,
+        season: d.season,
+        расход: d.factFuel,
+        расход100: d.fact100,
         timestamp: Date.now(),
-        cityKm: currentResultData.cityKm,
-        highwayKm: currentResultData.highwayKm,
+        cityKm: d.city,
+        highwayKm: d.hwy
     };
 
     const history = getHistory();
     history.push(entry);
     saveHistory(history);
     alert('✅ Сохранено!');
-    // Автоматически обновляем поле остатка при выезде для следующего ввода
     safeUpdateStartFuelFromHistory();
     updateStartFuelHint();
 });
 
-// ========== МОДАЛЬНОЕ ОКНО ИСТОРИИ ==========
+// ========== ИСТОРИЯ ==========
 function renderHistory() {
     const history = getHistory();
-    if (history.length === 0) {
-        historyList.innerHTML = '<p>История пуста.</p>';
-        return;
-    }
-    history.sort((a, b) => b.timestamp - a.timestamp);
-    let html = '<table><thead><tr><th>Дата</th><th>Выезд</th><th>Пробег</th><th>Расход</th><th>Норма</th><th>Сезон</th><th></th></tr></thead><tbody>';
-    history.forEach((entry, index) => {
-        const probegStr = (entry.cityKm || entry.highwayKm)
-            ? `${entry.пробег} (г${entry.cityKm?.toFixed(1)||0}+т${entry.highwayKm?.toFixed(1)||0})`
-            : entry.пробег;
+    if (!history.length) { historyList.innerHTML = '<p>История пуста.</p>'; return; }
+    history.sort((a,b) => b.timestamp - a.timestamp);
+    let html = '<table><thead><tr><th>Дата</th><th>Выезд</th><th>Возврат</th><th>Пробег</th><th>Расход</th><th>Нормы(г/т)</th><th></th></tr></thead><tbody>';
+    history.forEach((e, i) => {
+        const probegStr = (e.cityKm || e.highwayKm) ? `${e.пробег} (г${e.cityKm?.toFixed(1)||0}+т${e.highwayKm?.toFixed(1)||0})` : e.пробег;
         html += `<tr>
-            <td>${entry.date}</td>
-            <td>${entry.остатокВыезд} л</td>
+            <td>${e.date}</td>
+            <td>${e.остатокВыезд} л</td>
+            <td>${e.остатокВозврат} л</td>
             <td>${probegStr} км</td>
-            <td>${entry.расход} л</td>
-            <td>${entry.норма} л</td>
-            <td>${entry.сезон === 'winter' ? '❄️' : '☀️'}</td>
-            <td><button class="delete-entry" data-index="${index}">🗑</button></td>
+            <td>${e.расход} л (${e.расход100})</td>
+            <td>${e.normCity}/${e.normHwy}</td>
+            <td><button class="delete-entry" data-index="${i}">🗑</button></td>
         </tr>`;
     });
     html += '</tbody></table>';
     historyList.innerHTML = html;
 
     document.querySelectorAll('.delete-entry').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const idx = parseInt(e.target.getAttribute('data-index'));
-            deleteHistoryEntry(idx);
+        btn.addEventListener('click', e => {
+            deleteHistoryEntry(parseInt(e.target.getAttribute('data-index')));
         });
     });
 }
 
-function deleteHistoryEntry(index) {
+function deleteHistoryEntry(idx) {
     const history = getHistory();
-    history.sort((a, b) => b.timestamp - a.timestamp);
-    history.splice(index, 1);
+    history.sort((a,b) => b.timestamp - a.timestamp);
+    history.splice(idx, 1);
     saveHistory(history);
     renderHistory();
+    safeUpdateStartFuelFromHistory();
+    updateStartFuelHint();
 }
 
 clearHistoryBtn.addEventListener('click', () => {
     if (confirm('Удалить всю историю?')) {
         localStorage.removeItem('putevoyHistory');
         renderHistory();
-        // Очищаем поле остатка
         startFuelInput.value = '';
         updateStartFuelHint();
     }
 });
 
-document.getElementById('historyButton').addEventListener('click', () => {
-    renderHistory();
-    historyModal.style.display = 'flex';
-});
-
-closeHistoryModal.addEventListener('click', () => {
-    historyModal.style.display = 'none';
-});
-window.addEventListener('click', (e) => {
-    if (e.target === historyModal) historyModal.style.display = 'none';
-});
+document.getElementById('historyButton').addEventListener('click', () => { renderHistory(); historyModal.style.display = 'flex'; });
+closeHistoryModal.addEventListener('click', () => historyModal.style.display = 'none');
+window.addEventListener('click', e => { if (e.target === historyModal) historyModal.style.display = 'none'; });
 
 // ========== СТАРТ ==========
 startButton.addEventListener('click', startCamera);
