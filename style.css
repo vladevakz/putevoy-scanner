@@ -28,7 +28,6 @@ h1 {
     font-weight: 600;
 }
 
-/* Блок норм и сезона */
 .norms-compact {
     display: flex;
     justify-content: space-between;
@@ -36,7 +35,7 @@ h1 {
     background: #f0f8ff;
     border-radius: 10px;
     padding: 10px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     gap: 6px;
     flex-wrap: wrap;
 }
@@ -89,11 +88,13 @@ h1 {
 
 .weather-info {
     font-size: 13px;
-    margin-left: 2px;
-    min-width: 18px;
+    color: #2c3e50;
+    margin-bottom: 10px;
+    min-height: 20px;
+    text-align: center;
+    font-style: italic;
 }
 
-/* Мини-камера */
 .camera-mini {
     display: flex;
     align-items: center;
@@ -127,7 +128,6 @@ h1 {
     min-width: 20px;
 }
 
-/* Поля ввода — две колонки */
 .input-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -163,7 +163,6 @@ h1 {
     min-height: 14px;
 }
 
-/* Результаты */
 .results-compact {
     background: #f9f9f9;
     border-radius: 8px;
@@ -175,7 +174,6 @@ h1 {
     min-height: 40px;
 }
 
-/* Кнопки */
 .btn-group {
     display: flex;
     justify-content: center;
@@ -207,7 +205,6 @@ button:disabled {
     cursor: not-allowed;
 }
 
-/* Модальное окно */
 .modal {
     display: none;
     position: fixed;
