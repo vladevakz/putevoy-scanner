@@ -8,7 +8,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>📄 Калькулятор расчета топлива</h1>
+        <h1>📄 Калькулятор путевых листов</h1>
 
         <!-- Нормы и сезон -->
         <div class="norms-compact">
@@ -69,6 +69,7 @@
         <div class="btn-group">
             <button id="saveBtn">💾 Сохранить</button>
             <button id="historyBtn" class="secondary">📋 История</button>
+            <button id="pointsBtn" class="secondary">📌 Точки</button>
         </div>
     </div>
 
@@ -79,6 +80,22 @@
             <h2>📚 Сохранённые расчёты</h2>
             <div id="historyList"></div>
             <button id="clearHistoryBtn" class="danger">🗑 Очистить историю</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно точек -->
+    <div id="pointsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="closePointsModal">&times;</span>
+            <h2>📌 Ежедневные точки</h2>
+            <div class="points-form">
+                <input type="date" id="pointDate">
+                <input type="number" id="pointCount" placeholder="Кол-во" min="0" step="1">
+                <button id="addPointBtn">➕ Добавить</button>
+            </div>
+            <div id="pointsList" style="margin-top:15px;"></div>
+            <div id="pointsTotal" style="margin:10px 0; font-weight:bold;"></div>
+            <button id="clearPointsBtn" class="danger">🗑 Очистить всё</button>
         </div>
     </div>
 
