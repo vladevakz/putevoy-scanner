@@ -1,4 +1,4 @@
-// ===== ЭЛЕМЕНТЫ (основные и новые) =====
+// ===== ЭЛЕМЕНТЫ =====
 const dateInput = document.getElementById('dateInput');
 const startOdometer = document.getElementById('startOdometer');
 const startOdometerHint = document.getElementById('startOdometerHint');
@@ -39,74 +39,114 @@ let currentWeatherSeason = 'summer';
 
 // ===== НОРМЫ =====
 function saveNormValues() {
-    localStorage.setItem('normCitySummer', normCitySummer.value);
-    localStorage.setItem('normCityWinter', normCityWinter.value);
-    localStorage.setItem('normHwySummer', normHwySummer.value);
-    localStorage.setItem('normHwyWinter', normHwyWinter.value);
+    try {
+        localStorage.setItem('normCitySummer', normCitySummer.value);
+        localStorage.setItem('normCityWinter', normCityWinter.value);
+        localStorage.setItem('normHwySummer', normHwySummer.value);
+        localStorage.setItem('normHwyWinter', normHwyWinter.value);
+    } catch (e) {
+        console.warn('Не удалось сохранить нормы', e);
+    }
 }
 function loadNormValues() {
-    const s = {
-        cs: localStorage.getItem('normCitySummer'),
-        cw: localStorage.getItem('normCityWinter'),
-        hs: localStorage.getItem('normHwySummer'),
-        hw: localStorage.getItem('normHwyWinter')
-    };
-    if (s.cs !== null) normCitySummer.value = s.cs;
-    if (s.cw !== null) normCityWinter.value = s.cw;
-    if (s.hs !== null) normHwySummer.value = s.hs;
-    if (s.hw !== null) normHwyWinter.value = s.hw;
+    try {
+        const s = {
+            cs: localStorage.getItem('normCitySummer'),
+            cw: localStorage.getItem('normCityWinter'),
+            hs: localStorage.getItem('normHwySummer'),
+            hw: localStorage.getItem('normHwyWinter')
+        };
+        if (s.cs !== null) normCitySummer.value = s.cs;
+        if (s.cw !== null) normCityWinter.value = s.cw;
+        if (s.hs !== null) normHwySummer.value = s.hs;
+        if (s.hw !== null) normHwyWinter.value = s.hw;
+    } catch (e) {
+        console.warn('Не удалось загрузить нормы', e);
+    }
 }
 [normCitySummer, normCityWinter, normHwySummer, normHwyWinter].forEach(i => i.addEventListener('input', saveNormValues));
 
 // ===== ИСТОРИЯ (топливо) =====
 function getHistory() {
-    try { return JSON.parse(localStorage.getItem('putevoyHistory')) || []; } catch (e) { return []; }
+    try {
+        const raw = localStorage.getItem('putevoyHistory');
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        console.error('Ошибка чтения истории', e);
+        return [];
+    }
 }
 function saveHistory(arr) {
-    localStorage.setItem('putevoyHistory', JSON.stringify(arr));
+    try {
+        localStorage.setItem('putevoyHistory', JSON.stringify(arr));
+    } catch (e) {
+        alert('Не удалось сохранить историю. Возможно, переполнено хранилище.');
+        console.error(e);
+    }
 }
 
 // ===== ТОЧКИ =====
 function getPointsHistory() {
-    try { return JSON.parse(localStorage.getItem('pointsHistory')) || []; } catch (e) { return []; }
+    try {
+        const raw = localStorage.getItem('pointsHistory');
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        console.error('Ошибка чтения точек', e);
+        return [];
+    }
 }
 function savePointsHistory(arr) {
-    localStorage.setItem('pointsHistory', JSON.stringify(arr));
+    try {
+        localStorage.setItem('pointsHistory', JSON.stringify(arr));
+    } catch (e) {
+        alert('Не удалось сохранить точки. Хранилище переполнено или недоступно.');
+        console.error(e);
+    }
 }
 
-// Обновление таблицы точек
 function renderPoints() {
-    const points = getPointsHistory();
-    points.sort((a, b) => a.date.localeCompare(b.date) || b.timestamp - a.timestamp);
-    let total = 0;
-    let html = '<table><tr><th>Дата</th><th>Кол-во</th><th></th></tr>';
-    points.forEach((p, i) => {
-        total += p.count;
-        html += `<tr>
-            <td>${p.date}</td>
-            <td>${p.count}</td>
-            <td><button class="delete-point" data-index="${i}">🗑</button></td>
-        </tr>`;
-    });
-    html += '</table>';
-    pointsList.innerHTML = html;
-    pointsTotalDiv.textContent = `Всего точек: ${total}`;
-
-    // Удаление
-    document.querySelectorAll('.delete-point').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const idx = parseInt(e.target.getAttribute('data-index'));
-            deletePoint(idx);
+    try {
+        const points = getPointsHistory();
+        // Сортировка: по дате, затем по времени добавления
+        points.sort((a, b) => a.date.localeCompare(b.date) || (a.timestamp || 0) - (b.timestamp || 0));
+        let total = 0;
+        let html = '<table><tr><th>Дата</th><th>Кол-во</th><th></th></tr>';
+        points.forEach((p, i) => {
+            total += p.count;
+            html += `<tr>
+                <td>${p.date}</td>
+                <td>${p.count}</td>
+                <td><button class="delete-point" data-index="${i}">🗑</button></td>
+            </tr>`;
         });
-    });
+        html += '</table>';
+        pointsList.innerHTML = html;
+        pointsTotalDiv.textContent = `Всего точек: ${total}`;
+
+        document.querySelectorAll('.delete-point').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const idx = parseInt(e.target.getAttribute('data-index'));
+                deletePoint(idx);
+            });
+        });
+    } catch (e) {
+        console.error('Ошибка отрисовки точек', e);
+        pointsList.innerHTML = '<p style="color:red;">Ошибка загрузки точек</p>';
+    }
 }
 
 function deletePoint(idx) {
-    const points = getPointsHistory();
-    points.sort((a, b) => a.date.localeCompare(b.date) || b.timestamp - a.timestamp);
-    points.splice(idx, 1);
-    savePointsHistory(points);
-    renderPoints();
+    try {
+        const points = getPointsHistory();
+        points.sort((a, b) => a.date.localeCompare(b.date) || (a.timestamp || 0) - (b.timestamp || 0));
+        if (idx >= 0 && idx < points.length) {
+            points.splice(idx, 1);
+            savePointsHistory(points);
+            renderPoints();
+        }
+    } catch (e) {
+        console.error(e);
+    }
 }
 
 addPointBtn.addEventListener('click', () => {
@@ -117,7 +157,7 @@ addPointBtn.addEventListener('click', () => {
         return;
     }
     if (isNaN(count) || count < 0) {
-        alert('Введите корректное количество');
+        alert('Введите корректное количество (0 или больше)');
         return;
     }
     const entry = {
@@ -125,17 +165,26 @@ addPointBtn.addEventListener('click', () => {
         count: count,
         timestamp: Date.now()
     };
-    const points = getPointsHistory();
-    points.push(entry);
-    savePointsHistory(points);
-    pointCount.value = '';
-    renderPoints();
+    try {
+        const points = getPointsHistory();
+        points.push(entry);
+        savePointsHistory(points);
+        pointCount.value = '';
+        renderPoints();
+    } catch (e) {
+        alert('Не удалось добавить точку');
+        console.error(e);
+    }
 });
 
 clearPointsBtn.addEventListener('click', () => {
     if (confirm('Удалить все точки?')) {
-        savePointsHistory([]);
-        renderPoints();
+        try {
+            savePointsHistory([]);
+            renderPoints();
+        } catch (e) {
+            console.error(e);
+        }
     }
 });
 
@@ -158,11 +207,20 @@ async function fetchWeather() {
 }
 async function updateWeather() {
     const mode = document.querySelector('input[name="season"]:checked').value;
-    if (mode === 'winter') { weatherInfo.textContent = '❄️ Зима (вручную)'; return 'winter'; }
-    if (mode === 'summer') { weatherInfo.textContent = '☀️ Лето (вручную)'; return 'summer'; }
+    if (mode === 'winter') {
+        weatherInfo.textContent = '❄️ Зима (вручную)';
+        return 'winter';
+    }
+    if (mode === 'summer') {
+        weatherInfo.textContent = '☀️ Лето (вручную)';
+        return 'summer';
+    }
     weatherInfo.textContent = '🌍 Определяю погоду…';
     try {
-        const temp = await Promise.race([fetchWeather(), new Promise((_, reject) => setTimeout(() => reject(new Error('T')), 7000))]);
+        const temp = await Promise.race([
+            fetchWeather(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 7000))
+        ]);
         const season = temp < 0 ? 'winter' : 'summer';
         weatherInfo.textContent = `🌡️ ${temp}°C → ${season === 'winter' ? '❄️ Зима' : '☀️ Лето'}`;
         return season;
@@ -343,16 +401,19 @@ function deleteHistoryEntry(idx) {
     updateLiveResults();
 }
 
-// Обработчики модальных окон
 historyBtn.addEventListener('click', () => { renderHistory(); historyModal.style.display = 'flex'; });
 closeHistoryModal.addEventListener('click', () => historyModal.style.display = 'none');
 clearHistoryBtn.addEventListener('click', () => {
     if (confirm('Удалить всю историю расчётов?')) {
-        localStorage.removeItem('putevoyHistory');
-        renderHistory();
-        setStartOdometerFromHistory();
-        setStartFuelFromHistory();
-        updateLiveResults();
+        try {
+            localStorage.removeItem('putevoyHistory');
+            renderHistory();
+            setStartOdometerFromHistory();
+            setStartFuelFromHistory();
+            updateLiveResults();
+        } catch (e) {
+            console.error(e);
+        }
     }
 });
 
