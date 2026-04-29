@@ -11,35 +11,34 @@
     <div class="container">
         <h1>📄 Калькулятор путевых листов</h1>
 
-        <!-- Нормы и сезон в одной строке -->
+        <!-- Нормы и сезон -->
         <div class="norms-compact">
             <div class="norm-block">
-                <span>🏙️ Город</span>
+                <span>🏙️</span>
                 <label>Л <input type="number" id="normCitySummer" value="11.0" step="0.1"></label>
                 <label>З <input type="number" id="normCityWinter" value="13.0" step="0.1"></label>
             </div>
             <div class="norm-block">
-                <span>🛣️ Трасса</span>
+                <span>🛣️</span>
                 <label>Л <input type="number" id="normHwySummer" value="9.0" step="0.1"></label>
                 <label>З <input type="number" id="normHwyWinter" value="11.0" step="0.1"></label>
             </div>
             <div class="season-inline">
-                <span>📅</span>
                 <label><input type="radio" name="season" value="auto" checked> А</label>
                 <label><input type="radio" name="season" value="winter"> ❄️</label>
                 <label><input type="radio" name="season" value="summer"> ☀️</label>
-                <div id="weatherInfo" class="weather-info"></div>
+                <span id="weatherInfo" class="weather-info"></span>
             </div>
         </div>
 
-        <!-- Мини-камера для даты -->
+        <!-- Мини-камера -->
         <div class="camera-mini">
             <video id="video" playsinline autoplay></video>
             <button id="scanDateBtn" disabled>📸</button>
-            <div id="scanStatus" class="scan-status"></div>
+            <span id="scanStatus" class="scan-status"></span>
         </div>
 
-        <!-- Поля ввода в два столбца -->
+        <!-- Поля ввода (две колонки) -->
         <div class="input-grid">
             <div class="input-item">
                 <label>📅 Дата</label>
@@ -68,9 +67,9 @@
             </div>
         </div>
 
-        <!-- Живые результаты -->
+        <!-- Результаты -->
         <div id="resultsBlock" class="results-compact">
-            <div id="liveResults"></div>
+            <div id="liveResults">Введите данные</div>
         </div>
 
         <!-- Кнопки -->
