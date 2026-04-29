@@ -29,14 +29,13 @@ const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
 let currentWeatherSeason = 'summer';
 
-// Сохранение и загрузка норм
+// СОХРАНЕНИЕ НОРМ
 function saveNormValues() {
     localStorage.setItem('normCitySummer', normCitySummer.value);
     localStorage.setItem('normCityWinter', normCityWinter.value);
     localStorage.setItem('normHwySummer', normHwySummer.value);
     localStorage.setItem('normHwyWinter', normHwyWinter.value);
 }
-
 function loadNormValues() {
     const saved = {
         cs: localStorage.getItem('normCitySummer'),
@@ -49,12 +48,11 @@ function loadNormValues() {
     if (saved.hs !== null) normHwySummer.value = saved.hs;
     if (saved.hw !== null) normHwyWinter.value = saved.hw;
 }
-
 [normCitySummer, normCityWinter, normHwySummer, normHwyWinter].forEach(input => {
     input.addEventListener('input', saveNormValues);
 });
 
-// История
+// ИСТОРИЯ
 function getHistory() {
     try { return JSON.parse(localStorage.getItem('putevoyHistory')) || []; } catch (e) { return []; }
 }
@@ -62,16 +60,14 @@ function saveHistory(arr) {
     localStorage.setItem('putevoyHistory', JSON.stringify(arr));
 }
 
-// Погода
+// ПОГОДА
 async function fetchWeather() {
     if (!navigator.geolocation) throw new Error('Нет геолокации');
     return new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(
             async pos => {
                 try {
-                    const resp = await fetch(
-                        `https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&current_weather=true`
-                    );
+                    const resp = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&current_weather=true`);
                     const data = await resp.json();
                     resolve(data.current_weather.temperature);
                 } catch (e) { reject(e); }
@@ -81,23 +77,13 @@ async function fetchWeather() {
         );
     });
 }
-
 async function updateWeather() {
     const mode = document.querySelector('input[name="season"]:checked').value;
-    if (mode === 'winter') {
-        weatherInfo.textContent = '❄️ Зима (вручную)';
-        return 'winter';
-    }
-    if (mode === 'summer') {
-        weatherInfo.textContent = '☀️ Лето (вручную)';
-        return 'summer';
-    }
+    if (mode === 'winter') { weatherInfo.textContent = '❄️ Зима (вручную)'; return 'winter'; }
+    if (mode === 'summer') { weatherInfo.textContent = '☀️ Лето (вручную)'; return 'summer'; }
     weatherInfo.textContent = '🌍 Определяю погоду…';
     try {
-        const temp = await Promise.race([
-            fetchWeather(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 7000))
-        ]);
+        const temp = await Promise.race([fetchWeather(), new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 7000))]);
         const season = temp < 0 ? 'winter' : 'summer';
         weatherInfo.textContent = `🌡️ ${temp}°C → ${season === 'winter' ? '❄️ Зима' : '☀️ Лето'}`;
         return season;
@@ -107,26 +93,20 @@ async function updateWeather() {
     }
 }
 
-// Камера
+// КАМЕРА
 async function initCamera() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         video.srcObject = stream;
         scanBtn.disabled = false;
-    } catch (err) {
-        scanBtn.disabled = true;
-        scanStatus.textContent = 'нет';
-    }
+    } catch (err) { scanBtn.disabled = true; scanStatus.textContent = 'нет'; }
 }
-
 scanBtn.addEventListener('click', async () => {
-    scanBtn.disabled = true;
-    scanStatus.textContent = '...';
+    scanBtn.disabled = true; scanStatus.textContent = '...';
     try {
         const worker = await Tesseract.createWorker('rus+eng');
         const { data: { text } } = await worker.recognize(video);
         await worker.terminate();
-
         const dateMatch = text.match(/(\d{2}[./-]\d{2}[./-]\d{4})/);
         if (dateMatch) {
             const parts = dateMatch[1].split(/[./-]/);
@@ -140,7 +120,7 @@ scanBtn.addEventListener('click', async () => {
     scanBtn.disabled = false;
 });
 
-// Живой расчёт (полностью как в Excel)
+// ЖИВОЙ РАСЧЁТ
 function getActiveNorm(season) {
     const city = season === 'winter' ? parseFloat(normCityWinter.value) || 13 : parseFloat(normCitySummer.value) || 11;
     const hwy = season === 'winter' ? parseFloat(normHwyWinter.value) || 11 : parseFloat(normHwySummer.value) || 9;
@@ -165,47 +145,42 @@ function updateLiveResults() {
     const factFuel = start + fuel - end;
     const fact100 = probeg > 0 ? (factFuel / probeg) * 100 : 0;
     const deviation = factFuel - normTotal;
+    const deviationSign = deviation > 0 ? 'перерасход' : (deviation < 0 ? 'экономия' : 'норма');
 
-    // Завтрашний выезд
     let tomorrowHint = '';
     const history = getHistory();
     if (history.length) {
         history.sort((a, b) => b.timestamp - a.timestamp);
         const lastReturn = parseFloat(history[0].остатокВозврат);
         if (!isNaN(lastReturn)) {
-            tomorrowHint = `<p style="margin:4px 0; font-size:13px; color:#007aff;">📌 Завтрашний выезд: ${lastReturn.toFixed(2)} л (из ${history[0].date})</p>`;
+            tomorrowHint = `<p style="margin:4px 0;font-size:13px;color:#007aff;">📌 Завтрашний выезд: ${lastReturn.toFixed(2)} л (из ${history[0].date})</p>`;
         }
     }
 
     let warning = '';
-    if (end === 0 && (city > 0 || hwy > 0)) {
-        warning = '<p style="color:#dc3545;margin:4px 0;">⚠️ Возврат не указан – расход завышен! Впишите реальный остаток в баке.</p>';
+    if ((end === 0 || endFuel.value.trim() === '') && (city > 0 || hwy > 0)) {
+        warning = '<p style="color:#dc3545;margin:4px 0;">⚠️ Возврат не указан – расход завышен! Впишите реальный остаток в баке после поездки.</p>';
     }
 
     liveResults.innerHTML = `
-        <p style="margin:0 0 4px;">⛽ Выезд: ${start.toFixed(2)} л | 🛢️ Заправ: ${fuel.toFixed(2)} л | 🏁 Возврат: ${end.toFixed(2)} л</p>
-        <p style="margin:0 0 4px;">${season === 'winter' ? '❄️' : '☀️'} Нормы: г.${norms.city} / т.${norms.hwy}</p>
-        <p style="margin:0 0 4px;">📊 Норм.расход: гор.${normCityL.toFixed(2)} + тр.${normHwyL.toFixed(2)} = ${normTotal.toFixed(2)} л (ср.норма ${avgNorm.toFixed(2)} л/100км)</p>
-        <p style="margin:0 0 4px;"><strong>🛞 Факт: ${factFuel.toFixed(2)} л (${fact100.toFixed(2)} л/100км) | Откл: ${deviation.toFixed(2)} л</strong></p>
+        <p style="margin:0 0 4px;">⛽ <b>Выезд:</b> ${start.toFixed(2)} л | 🛢️ <b>Заправ:</b> ${fuel.toFixed(2)} л | 🏁 <b>Возврат:</b> ${end.toFixed(2)} л</p>
+        <p style="margin:0 0 4px;">${season === 'winter' ? '❄️' : '☀️'} Нормы: г.${norms.city.toFixed(1)} / т.${norms.hwy.toFixed(1)}</p>
+        <p style="margin:0 0 4px;">📊 Норм. расход: город ${normCityL.toFixed(2)} л + трасса ${normHwyL.toFixed(2)} л = <b>${normTotal.toFixed(2)} л</b> (ср. ${avgNorm.toFixed(2)} л/100км)</p>
+        <p style="margin:0 0 4px;">🛞 <b>Факт. расход:</b> ${factFuel.toFixed(2)} л (${fact100.toFixed(2)} л/100км) | <i>${deviationSign} ${Math.abs(deviation).toFixed(2)} л</i></p>
         ${tomorrowHint}
         ${warning}
     `;
-
     updateStartFuelHint();
 }
 
 function updateStartFuelHint() {
     const val = parseFloat(startFuel.value);
     const history = getHistory();
-    if (history.length === 0) {
-        startFuelHint.textContent = '';
-        return;
-    }
+    if (history.length === 0) { startFuelHint.textContent = ''; return; }
     history.sort((a, b) => b.timestamp - a.timestamp);
-    const last = history[0];
-    const lastReturn = parseFloat(last.остатокВозврат);
+    const lastReturn = parseFloat(history[0].остатокВозврат);
     if (!isNaN(lastReturn) && !isNaN(val) && Math.abs(lastReturn - val) < 0.01) {
-        startFuelHint.textContent = `из ${last.date}`;
+        startFuelHint.textContent = `из ${history[0].date}`;
     } else if (!isNaN(val)) {
         startFuelHint.textContent = 'вручную';
     } else {
@@ -213,27 +188,21 @@ function updateStartFuelHint() {
     }
 }
 
-// Заполнение выезда из истории при загрузке
 function setStartFuelFromHistory() {
     const history = getHistory();
-    if (history.length === 0) {
-        startFuel.value = '';
-        startFuelHint.textContent = '';
-        return;
-    }
+    if (history.length === 0) { startFuel.value = ''; startFuelHint.textContent = ''; return; }
     history.sort((a, b) => b.timestamp - a.timestamp);
-    const last = history[0];
-    const returnFuel = parseFloat(last.остатокВозврат);
-    if (!isNaN(returnFuel)) {
-        startFuel.value = returnFuel.toFixed(2);
-        startFuelHint.textContent = `из ${last.date}`;
+    const lastReturn = parseFloat(history[0].остатокВозврат);
+    if (!isNaN(lastReturn)) {
+        startFuel.value = lastReturn.toFixed(2);
+        startFuelHint.textContent = `из ${history[0].date}`;
     } else {
         startFuel.value = '';
         startFuelHint.textContent = '';
     }
 }
 
-// Сохранение в историю
+// СОХРАНЕНИЕ
 saveBtn.addEventListener('click', () => {
     const startVal = parseFloat(startFuel.value) || 0;
     const endVal = parseFloat(endFuel.value) || 0;
@@ -263,7 +232,7 @@ saveBtn.addEventListener('click', () => {
     updateLiveResults();
 });
 
-// Отображение истории
+// ОТОБРАЖЕНИЕ ИСТОРИИ
 function renderHistory() {
     const history = getHistory();
     if (!history.length) { historyList.innerHTML = '<p>История пуста.</p>'; return; }
@@ -279,10 +248,7 @@ function renderHistory() {
     html += '</table>';
     historyList.innerHTML = html;
     document.querySelectorAll('.delete-entry').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const idx = parseInt(e.target.dataset.index);
-            deleteHistoryEntry(idx);
-        });
+        btn.addEventListener('click', (e) => deleteHistoryEntry(parseInt(e.target.dataset.index)));
     });
 }
 
@@ -306,17 +272,16 @@ clearHistoryBtn.addEventListener('click', () => {
 });
 window.addEventListener('click', e => { if (e.target === historyModal) historyModal.style.display = 'none'; });
 
-// Слушатели на поля ввода
+// СЛУШАТЕЛИ
 document.querySelectorAll('#startFuel, #endFuel, #cityKm, #highwayKm, #fuelAdded, #dateInput').forEach(input => {
     input.addEventListener('input', updateLiveResults);
 });
-
 seasonRadios.forEach(r => r.addEventListener('change', async () => {
     currentWeatherSeason = await updateWeather();
     updateLiveResults();
 }));
 
-// Старт
+// СТАРТ
 window.addEventListener('DOMContentLoaded', async () => {
     loadNormValues();
     dateInput.value = new Date().toISOString().split('T')[0];
