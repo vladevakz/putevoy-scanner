@@ -31,26 +31,20 @@ let currentWeatherSeason = 'summer'; // по умолчанию
 
 // ===== ИСТОРИЯ =====
 function getHistory() {
-    try {
-        const raw = localStorage.getItem('putevoyHistory');
-        return raw ? JSON.parse(raw) : [];
-    } catch (e) { return []; }
+    try { return JSON.parse(localStorage.getItem('putevoyHistory')) || []; } catch (e) { return []; }
 }
-
 function saveHistory(arr) {
     localStorage.setItem('putevoyHistory', JSON.stringify(arr));
 }
 
 // ===== ПОГОДА =====
-async function fetchWeather() {
+function fetchWeather() {
     return new Promise((resolve, reject) => {
         if (!navigator.geolocation) return reject('Нет геолокации');
         navigator.geolocation.getCurrentPosition(
             async pos => {
                 try {
-                    const resp = await fetch(
-                        `https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&current_weather=true`
-                    );
+                    const resp = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&current_weather=true`);
                     const data = await resp.json();
                     resolve(data.current_weather.temperature);
                 } catch (e) { reject(e); }
@@ -64,30 +58,30 @@ async function fetchWeather() {
 async function updateWeather() {
     const mode = document.querySelector('input[name="season"]:checked').value;
     if (mode === 'winter') {
-        weatherInfo.textContent = '❄️ Зима (вручную)';
+        weatherInfo.textContent = '❄️';
         return 'winter';
     }
     if (mode === 'summer') {
-        weatherInfo.textContent = '☀️ Лето (вручную)';
+        weatherInfo.textContent = '☀️';
         return 'summer';
     }
     // Авто
-    weatherInfo.textContent = '🌍 Определяю погоду...';
+    weatherInfo.textContent = '…';
     try {
         const temp = await Promise.race([
             fetchWeather(),
             new Promise((_, reject) => setTimeout(() => reject('Таймаут'), 7000))
         ]);
         const season = temp < 0 ? 'winter' : 'summer';
-        weatherInfo.textContent = `🌡️ ${temp}°C → ${season === 'winter' ? '❄️ Зима' : '☀️ Лето'}`;
+        weatherInfo.textContent = season === 'winter' ? '❄️' : '☀️';
         return season;
     } catch (e) {
-        weatherInfo.textContent = '⚠️ Погода недоступна, взято лето';
+        weatherInfo.textContent = '☀️';
         return 'summer';
     }
 }
 
-// ===== ИНИЦИАЛИЗАЦИЯ КАМЕРЫ ДЛЯ ДАТЫ =====
+// ===== КАМЕРА ДЛЯ ДАТЫ =====
 async function initCamera() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -95,35 +89,28 @@ async function initCamera() {
         scanBtn.disabled = false;
     } catch (err) {
         scanBtn.disabled = true;
-        scanStatus.textContent = 'Камера недоступна';
+        scanStatus.textContent = 'Нет камеры';
     }
 }
 
 scanBtn.addEventListener('click', async () => {
     scanBtn.disabled = true;
-    scanStatus.textContent = 'Сканирую дату...';
+    scanStatus.textContent = '…';
     try {
         const worker = await Tesseract.createWorker('rus+eng');
         const { data: { text } } = await worker.recognize(video);
         await worker.terminate();
 
-        // Ищем дату
         const dateMatch = text.match(/(\d{2}[./-]\d{2}[./-]\d{4})/);
         if (dateMatch) {
             const parts = dateMatch[1].split(/[./-]/);
             if (parts.length === 3) {
                 const [d, m, y] = parts;
                 dateInput.value = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
-                scanStatus.textContent = `✅ Распознано: ${d}.${m}.${y}`;
-            } else {
-                scanStatus.textContent = '❌ Неверный формат';
-            }
-        } else {
-            scanStatus.textContent = '❌ Дата не найдена';
-        }
-    } catch (e) {
-        scanStatus.textContent = 'Ошибка распознавания';
-    }
+                scanStatus.textContent = '✅';
+            } else scanStatus.textContent = '❌';
+        } else scanStatus.textContent = '?';
+    } catch (e) { scanStatus.textContent = '!'; }
     scanBtn.disabled = false;
 });
 
@@ -153,13 +140,10 @@ function updateLiveResults() {
     const fact100 = probeg > 0 ? (factFuel / probeg) * 100 : 0;
     const deviation = factFuel - normTotal;
 
+    const seasonSymbol = season === 'winter' ? '❄️' : '☀️';
     liveResults.innerHTML = `
-        <p><strong>🏙️ Норм. расход город:</strong> ${normCityTotal.toFixed(2)} л (норма ${norms.city})</p>
-        <p><strong>🛣️ Норм. расход трасса:</strong> ${normHwyTotal.toFixed(2)} л (норма ${norms.hwy})</p>
-        <p><strong>📊 Норм. расход общий:</strong> ${normTotal.toFixed(2)} л (средняя норма ${avgNorm.toFixed(2)} л/100км)</p>
-        <hr>
-        <p style="font-size:1.2em;"><strong>🛞 Факт. расход:</strong> ${factFuel.toFixed(2)} л (${fact100.toFixed(2)} л/100км)</p>
-        <p><strong>📈 Отклонение:</strong> ${deviation.toFixed(2)} л</p>
+        <p>${seasonSymbol} Нормы: г.${norms.city} / т.${norms.hwy} | Ср.норма: ${avgNorm.toFixed(2)} л/100км</p>
+        <p><strong>Расход: ${factFuel.toFixed(2)} л (${fact100.toFixed(2)} л/100км) | Откл: ${deviation.toFixed(2)} л</strong></p>
     `;
 }
 
@@ -186,22 +170,26 @@ function setStartFuelFromHistory() {
     const last = history[0];
     if (last.остатокВозврат !== undefined && !isNaN(parseFloat(last.остатокВозврат))) {
         startFuel.value = parseFloat(last.остатокВозврат).toFixed(2);
-        startFuelHint.textContent = `Из истории (${last.date})`;
+        startFuelHint.textContent = `из ${last.date}`;
     } else {
         startFuel.value = '';
-        startFuelHint.textContent = 'Нет данных';
+        startFuelHint.textContent = 'нет данных';
     }
 }
 
 // ===== СОХРАНЕНИЕ =====
 saveBtn.addEventListener('click', () => {
+    const startVal = (parseFloat(startFuel.value) || 0).toFixed(2);
+    const endVal = (parseFloat(endFuel.value) || 0).toFixed(2);
+    const probeg = (parseFloat(cityKm.value) || 0) + (parseFloat(highwayKm.value) || 0);
+
     const entry = {
         date: dateInput.value || new Date().toISOString().split('T')[0],
-        остатокВыезд: (parseFloat(startFuel.value) || 0).toFixed(2),
-        остатокВозврат: (parseFloat(endFuel.value) || 0).toFixed(2),
+        остатокВыезд: startVal,
+        остатокВозврат: endVal,
         заправлено: (parseFloat(fuelAdded.value) || 0).toFixed(2),
-        пробег: ((parseFloat(cityKm.value) || 0) + (parseFloat(highwayKm.value) || 0)).toFixed(2),
-        расход: document.querySelector('#liveResults p:nth-child(5)')?.textContent.split(' ')[1] || '0',
+        пробег: probeg.toFixed(2),
+        расход: (parseFloat(startVal) + parseFloat(fuelAdded.value || 0) - parseFloat(endVal)).toFixed(2),
         timestamp: Date.now(),
         season: currentWeatherSeason,
     };
@@ -216,16 +204,13 @@ saveBtn.addEventListener('click', () => {
 // ===== ИСТОРИЯ (МОДАЛЬНОЕ ОКНО) =====
 function renderHistory() {
     const history = getHistory();
-    if (!history.length) {
-        historyList.innerHTML = '<p>Пусто</p>';
-        return;
-    }
+    if (!history.length) { historyList.innerHTML = '<p>Пусто</p>'; return; }
     history.sort((a, b) => b.timestamp - a.timestamp);
     let html = '<table><tr><th>Дата</th><th>Выезд</th><th>Возврат</th><th>Пробег</th><th>Расход</th></tr>';
     history.forEach((e, i) => {
         html += `<tr>
-            <td>${e.date}</td><td>${e.остатокВыезд} л</td><td>${e.остатокВозврат} л</td>
-            <td>${e.пробег} км</td><td>${e.расход} л</td>
+            <td>${e.date}</td><td>${e.остатокВыезд}</td><td>${e.остатокВозврат}</td>
+            <td>${e.пробег}</td><td>${e.расход}</td>
             <td><button class="delete-entry" data-index="${i}">🗑</button></td>
         </tr>`;
     });
@@ -266,7 +251,6 @@ window.addEventListener('click', e => { if (e.target === historyModal) historyMo
     currentWeatherSeason = await updateWeather();
     updateLiveResults();
     initCamera();
-    // подписка на изменение остатка (для подсказки)
     startFuel.addEventListener('input', () => {
         const val = parseFloat(startFuel.value);
         if (!isNaN(val)) {
@@ -275,8 +259,8 @@ window.addEventListener('click', e => { if (e.target === historyModal) historyMo
                 history.sort((a, b) => b.timestamp - a.timestamp);
                 const last = history[0];
                 if (Math.abs(parseFloat(last.остатокВозврат) - val) < 0.01)
-                    startFuelHint.textContent = `Из истории (${last.date})`;
-                else startFuelHint.textContent = 'Вручную';
+                    startFuelHint.textContent = `из ${last.date}`;
+                else startFuelHint.textContent = 'вручную';
             }
         }
         updateLiveResults();
