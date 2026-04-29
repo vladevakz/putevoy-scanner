@@ -11,7 +11,7 @@
     <div class="container">
         <h1>📄 Калькулятор путевых листов</h1>
 
-        <!-- Нормы и сезон -->
+        <!-- Блок норм -->
         <div class="norms-compact">
             <div class="norm-block">
                 <span>🏙️</span>
@@ -38,7 +38,7 @@
             <span id="scanStatus" class="scan-status"></span>
         </div>
 
-        <!-- Поля ввода -->
+        <!-- Поля ввода (без возврата!) -->
         <div class="input-grid">
             <div class="input-item">
                 <label>📅 Дата</label>
@@ -48,11 +48,6 @@
                 <label>⛽ Выезд (л)</label>
                 <input type="number" id="startFuel" step="0.1" placeholder="0">
                 <small id="startFuelHint"></small>
-            </div>
-            <div class="input-item">
-                <label>🏁 Возврат (л)</label>
-                <input type="number" id="endFuel" step="0.1" placeholder="Авто">
-                <small>Оставьте пустым для авторасчёта</small>
             </div>
             <div class="input-item">
                 <label>🏙️ Город (км)</label>
