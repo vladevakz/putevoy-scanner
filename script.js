@@ -29,7 +29,7 @@ const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
 let currentWeatherSeason = 'summer';
 
-// ===== СОХРАНЕНИЕ НОРМ =====
+// ===== СОХРАНЕНИЕ И ЗАГРУЗКА НОРМ =====
 function saveNormValues() {
     localStorage.setItem('normCitySummer', normCitySummer.value);
     localStorage.setItem('normCityWinter', normCityWinter.value);
@@ -64,9 +64,9 @@ function saveHistory(arr) {
 }
 
 // ===== ПОГОДА =====
-function fetchWeather() {
+async function fetchWeather() {
+    if (!navigator.geolocation) throw new Error('Нет геолокации');
     return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) return reject('Нет геолокации');
         navigator.geolocation.getCurrentPosition(
             async pos => {
                 try {
@@ -97,7 +97,7 @@ async function updateWeather() {
     try {
         const temp = await Promise.race([
             fetchWeather(),
-            new Promise((_, reject) => setTimeout(() => reject('Timeout'), 7000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 7000))
         ]);
         const season = temp < 0 ? 'winter' : 'summer';
         weatherInfo.textContent = `🌡️ ${temp}°C → ${season === 'winter' ? '❄️ Зима' : '☀️ Лето'}`;
@@ -141,7 +141,7 @@ scanBtn.addEventListener('click', async () => {
     scanBtn.disabled = false;
 });
 
-// ===== ЖИВОЙ РАСЧЁТ (правильная формула!) =====
+// ===== ЖИВОЙ РАСЧЁТ (правильная формула) =====
 function getActiveNorm(season) {
     const city = season === 'winter' ? parseFloat(normCityWinter.value) || 13 : parseFloat(normCitySummer.value) || 11;
     const hwy = season === 'winter' ? parseFloat(normHwyWinter.value) || 11 : parseFloat(normHwySummer.value) || 9;
@@ -167,6 +167,17 @@ function updateLiveResults() {
     const fact100 = probeg > 0 ? (factFuel / probeg) * 100 : 0;
     const deviation = factFuel - normTotal;
 
+    // Информация о завтрашнем выезде (последний сохранённый возврат)
+    let tomorrowHint = '';
+    const history = getHistory();
+    if (history.length) {
+        history.sort((a, b) => b.timestamp - a.timestamp);
+        const lastReturn = parseFloat(history[0].остатокВозврат);
+        if (!isNaN(lastReturn)) {
+            tomorrowHint = `<p style="margin:4px 0; font-size:13px; color:#007aff;">📌 Завтрашний выезд: ${lastReturn.toFixed(2)} л (из ${history[0].date})</p>`;
+        }
+    }
+
     let warning = '';
     if (end === 0 && (city > 0 || hwy > 0)) {
         warning = '<p style="color:#dc3545;margin:4px 0;">⚠️ Возврат не указан – расход завышен! Впишите реальный остаток в баке.</p>';
@@ -176,43 +187,55 @@ function updateLiveResults() {
         <p style="margin:0 0 4px;">⛽ Выезд: ${start.toFixed(2)} л | 🛢️ Заправ: ${fuel.toFixed(2)} л | 🏁 Возврат: ${end.toFixed(2)} л</p>
         <p style="margin:0 0 4px;">${season === 'winter' ? '❄️' : '☀️'} Нормы: г.${norms.city} / т.${norms.hwy} | Ср.норма: ${avgNorm.toFixed(2)} л/100км</p>
         <p style="margin:0 0 4px;"><strong>Расход: ${factFuel.toFixed(2)} л (${fact100.toFixed(2)} л/100км) | Откл: ${deviation.toFixed(2)} л</strong></p>
+        ${tomorrowHint}
         ${warning}
     `;
+
+    // Обновляем подсказку под полем «Выезд»
+    updateStartFuelHint();
 }
 
-// Навешиваем слушатели на все поля
-document.querySelectorAll('#startFuel, #endFuel, #cityKm, #highwayKm, #fuelAdded, #dateInput').forEach(input => {
-    input.addEventListener('input', updateLiveResults);
-});
+// ===== ПОДСКАЗКА ДЛЯ ВЫЕЗДА =====
+function updateStartFuelHint() {
+    const val = parseFloat(startFuel.value);
+    const history = getHistory();
+    if (history.length === 0) {
+        startFuelHint.textContent = '';
+        return;
+    }
+    history.sort((a, b) => b.timestamp - a.timestamp);
+    const last = history[0];
+    const lastReturn = parseFloat(last.остатокВозврат);
+    if (!isNaN(lastReturn) && !isNaN(val) && Math.abs(lastReturn - val) < 0.01) {
+        startFuelHint.textContent = `из ${last.date}`;
+    } else if (!isNaN(val)) {
+        startFuelHint.textContent = 'вручную';
+    } else {
+        startFuelHint.textContent = '';
+    }
+}
 
-// Сезон меняется
-seasonRadios.forEach(r => r.addEventListener('change', async () => {
-    currentWeatherSeason = await updateWeather();
-    updateLiveResults();
-}));
-
-// ===== АВТОПОДСТАВКА ВЫЕЗДА ИЗ ИСТОРИИ =====
+// ===== АВТОПОДСТАВКА ВЫЕЗДА ПРИ ЗАГРУЗКЕ СТРАНИЦЫ =====
 function setStartFuelFromHistory() {
     const history = getHistory();
     if (history.length === 0) {
         startFuel.value = '';
-        startFuelHint.textContent = 'нет истории';
+        startFuelHint.textContent = '';
         return;
     }
-    // Берем самую свежую запись
     history.sort((a, b) => b.timestamp - a.timestamp);
     const last = history[0];
     const returnFuel = parseFloat(last.остатокВозврат);
     if (!isNaN(returnFuel)) {
         startFuel.value = returnFuel.toFixed(2);
-        startFuelHint.textContent = returnFuel === 0 ? `из ${last.date} (был 0)` : `из ${last.date}`;
+        startFuelHint.textContent = `из ${last.date}`;
     } else {
         startFuel.value = '';
-        startFuelHint.textContent = 'нет данных';
+        startFuelHint.textContent = '';
     }
 }
 
-// ===== СОХРАНЕНИЕ В ИСТОРИЮ =====
+// ===== СОХРАНЕНИЕ =====
 saveBtn.addEventListener('click', () => {
     const startVal = parseFloat(startFuel.value) || 0;
     const endVal = parseFloat(endFuel.value) || 0;
@@ -239,7 +262,8 @@ saveBtn.addEventListener('click', () => {
     history.push(entry);
     saveHistory(history);
     alert('✅ Сохранено!');
-    setStartFuelFromHistory(); // обновит выезд на сегодняшний возврат, если надо
+    // Не меняем поле выезда, оно остаётся сегодняшним.
+    // Обновим результаты, чтобы появилась информация о завтрашнем выезде
     updateLiveResults();
 });
 
@@ -272,7 +296,6 @@ function deleteHistoryEntry(idx) {
     history.splice(idx, 1);
     saveHistory(history);
     renderHistory();
-    setStartFuelFromHistory();
     updateLiveResults();
 }
 
@@ -282,35 +305,26 @@ clearHistoryBtn.addEventListener('click', () => {
     if (confirm('Удалить всю историю?')) {
         localStorage.removeItem('putevoyHistory');
         renderHistory();
-        setStartFuelFromHistory();
         updateLiveResults();
     }
 });
 window.addEventListener('click', e => { if (e.target === historyModal) historyModal.style.display = 'none'; });
 
-// ===== ПЕРВЫЙ ЗАПУСК =====
-(async function () {
+// ===== СЛУШАТЕЛИ НА ПОЛЯ =====
+document.querySelectorAll('#startFuel, #endFuel, #cityKm, #highwayKm, #fuelAdded, #dateInput').forEach(input => {
+    input.addEventListener('input', updateLiveResults);
+});
+seasonRadios.forEach(r => r.addEventListener('change', async () => {
+    currentWeatherSeason = await updateWeather();
+    updateLiveResults();
+}));
+
+// ===== ЗАГРУЗКА СТРАНИЦЫ =====
+window.addEventListener('DOMContentLoaded', async () => {
     loadNormValues();
     dateInput.value = new Date().toISOString().split('T')[0];
-    setStartFuelFromHistory();
+    setStartFuelFromHistory();      // заполняем выезд из последнего возврата
     currentWeatherSeason = await updateWeather();
     updateLiveResults();
     initCamera();
-
-    // Обновление подсказки при ручном изменении выезда
-    startFuel.addEventListener('input', () => {
-        const val = parseFloat(startFuel.value);
-        if (!isNaN(val)) {
-            const history = getHistory();
-            if (history.length) {
-                history.sort((a, b) => b.timestamp - a.timestamp);
-                const last = history[0];
-                const lastReturn = parseFloat(last.остатокВозврат);
-                if (!isNaN(lastReturn) && Math.abs(lastReturn - val) < 0.01)
-                    startFuelHint.textContent = `из ${last.date}`;
-                else startFuelHint.textContent = 'вручную';
-            }
-        }
-        updateLiveResults();
-    });
-})();
+});
