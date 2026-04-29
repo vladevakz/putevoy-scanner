@@ -6,6 +6,7 @@ const rawTextDiv = document.getElementById('rawText');
 const weatherInfoDiv = document.getElementById('weatherInfo');
 
 // Поля ручного ввода
+const startFuelInput = document.getElementById('startFuel');
 const cityKmInput = document.getElementById('cityKm');
 const highwayKmInput = document.getElementById('highwayKm');
 const fuelAddedManual = document.getElementById('fuelAddedManual');
@@ -28,14 +29,27 @@ const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 // Текущие данные для сохранения
 let currentResultData = null;
 
-// ========== ВОССТАНОВЛЕНИЕ НОРМ ИЗ LOCALSTORAGE ==========
+// ========== ВОССТАНОВЛЕНИЕ НОРМ И ОСТАТКА ПРИ ЗАГРУЗКЕ ==========
 window.addEventListener('DOMContentLoaded', () => {
+    // Нормы
     const savedSummer = localStorage.getItem('normSummer');
     const savedWinter = localStorage.getItem('normWinter');
     if (savedSummer !== null) normSummerInput.value = savedSummer;
     if (savedWinter !== null) normWinterInput.value = savedWinter;
+
+    // Остаток при выезде из последней записи истории
+    const history = getHistory();
+    if (history.length > 0) {
+        // Сортируем по timestamp (последняя запись)
+        history.sort((a, b) => b.timestamp - a.timestamp);
+        const last = history[0];
+        if (last.остатокВозврат !== undefined) {
+            startFuelInput.value = last.остатокВозврат;
+        }
+    }
 });
 
+// Сохранение норм при изменении
 normSummerInput.addEventListener('input', () => {
     localStorage.setItem('normSummer', normSummerInput.value);
 });
@@ -57,7 +71,7 @@ async function startCamera() {
     }
 }
 
-// ========== ПОГОДА (с жёстким таймаутом) ==========
+// ========== ПОГОДА (с таймаутом) ==========
 function getSelectedSeasonMode() {
     for (const radio of seasonRadios) {
         if (radio.checked) return radio.value;
@@ -238,25 +252,41 @@ async function recognizeWithLang(image, lang, timeoutMs) {
 }
 
 // ========== ИЗВЛЕЧЕНИЕ ДАННЫХ И ВЫЧИСЛЕНИЯ ==========
+function getLastHistoryReturnFuel() {
+    const history = getHistory();
+    if (history.length === 0) return { value: 0, source: 'нет истории' };
+    history.sort((a, b) => b.timestamp - a.timestamp);
+    const last = history[0];
+    const val = last.остатокВозврат !== undefined ? parseFloat(last.остатокВозврат) : 0;
+    return { value: val, source: 'из истории (' + last.date + ')' };
+}
+
 function extractDataFromText(rawText, norm, season) {
-    // --- Ручные поля ---
+    // --- Остаток при выезде ---
+    const startFuelManual = startFuelInput.value.trim();
+    let остатокВыезд, startFuelSource;
+
+    if (startFuelManual !== '') {
+        остатокВыезд = parseFloat(startFuelManual) || 0;
+        startFuelSource = '(вручную)';
+    } else {
+        const ocrMatch = rawText.match(/остаток.?при.?выезде[:\s]*(\d+)/i);
+        if (ocrMatch) {
+            остатокВыезд = parseFloat(ocrMatch[1]);
+            startFuelSource = '(из документа)';
+        } else {
+            const hist = getLastHistoryReturnFuel();
+            остатокВыезд = hist.value;
+            startFuelSource = '(из истории)';
+        }
+    }
+
+    // --- Пробег ---
     const cityKm = parseFloat(cityKmInput.value) || 0;
     const highwayKm = parseFloat(highwayKmInput.value) || 0;
-    const manualFuel = fuelAddedManual.value.trim();
-    const manualFuelValue = manualFuel !== '' ? parseFloat(manualFuel) || 0 : null;
-
-    // --- OCR ---
     const пробегOcrMatch = rawText.match(/пробег[:\s]*(\d+)/i);
-    const остатокВыездMatch = rawText.match(/остаток.?при.?выезде[:\s]*(\d+)/i);
-    const остатокВозвратMatch = rawText.match(/остаток.?при.?возврате[:\s]*(\d+)/i);
-    const заправленоOcrMatch = rawText.match(/заправлено[:\s]*(\d+)/i);
 
-    const остатокВыезд = остатокВыездMatch ? parseFloat(остатокВыездMatch[1]) : 0;
-    const остатокВозврат = остатокВозвратMatch ? parseFloat(остатокВозвратMatch[1]) : 0;
-
-    // Пробег: сумма город+трасса, если введены, иначе OCR
-    let пробег;
-    let пробегИсточник = '';
+    let пробег, пробегИсточник;
     if (cityKm > 0 || highwayKm > 0) {
         пробег = cityKm + highwayKm;
         пробегИсточник = `(город ${cityKm.toFixed(1)} + трасса ${highwayKm.toFixed(1)})`;
@@ -268,11 +298,13 @@ function extractDataFromText(rawText, norm, season) {
         пробегИсточник = '(не указан)';
     }
 
-    // Заправка: ручная приоритетнее
-    let заправлено;
-    let заправкаИсточник = '';
-    if (manualFuelValue !== null) {
-        заправлено = manualFuelValue;
+    // --- Заправка ---
+    const manualFuel = fuelAddedManual.value.trim();
+    const заправленоOcrMatch = rawText.match(/заправлено[:\s]*(\d+)/i);
+    let заправлено, заправкаИсточник;
+
+    if (manualFuel !== '') {
+        заправлено = parseFloat(manualFuel) || 0;
         заправкаИсточник = '(вручную)';
     } else if (заправленоOcrMatch) {
         заправлено = parseFloat(заправленоOcrMatch[1]);
@@ -281,6 +313,10 @@ function extractDataFromText(rawText, norm, season) {
         заправлено = 0;
         заправкаИсточник = '(0)';
     }
+
+    // --- Остаток при возврате (OCR) ---
+    const ocrReturnMatch = rawText.match(/остаток.?при.?возврате[:\s]*(\d+)/i);
+    const остатокВозврат = ocrReturnMatch ? parseFloat(ocrReturnMatch[1]) : 0;
 
     // --- Вычисления с округлением до 2 знаков ---
     const расход = остатокВыезд + заправлено - остатокВозврат;
@@ -310,8 +346,10 @@ function extractDataFromText(rawText, norm, season) {
 
     return {
         rawText,
+        остатокВыезд, startFuelSource,
         пробег, пробегИсточник,
-        остатокВыезд, заправлено, остатокВозврат, заправкаИсточник,
+        заправлено, заправкаИсточник,
+        остатокВозврат,
         расход: расходFixed, расходНа100км, нормативныйРасход, отклонение,
         norm, season, сезонНазвание,
         isoDate, dateStr,
@@ -325,8 +363,8 @@ function openResultModal(data) {
 
     modalCalculations.innerHTML = `
         <p><strong>📅 Дата:</strong> ${data.isoDate}</p>
+        <p><strong>⛽ Остаток при выезде:</strong> ${data.остатокВыезд.toFixed(2)} л ${data.startFuelSource}</p>
         <p><strong>📏 Пробег общий:</strong> ${data.пробег.toFixed(2)} км ${data.пробегИсточник}</p>
-        <p><strong>⛽ Остаток при выезде:</strong> ${data.остатокВыезд.toFixed(2)} л</p>
         <p><strong>🛢️ Заправлено:</strong> ${data.заправлено.toFixed(2)} л ${data.заправкаИсточник}</p>
         <p><strong>🏁 Остаток при возврате:</strong> ${data.остатокВозврат.toFixed(2)} л</p>
         <hr>
@@ -367,8 +405,8 @@ saveToHistoryBtn.addEventListener('click', () => {
     if (!currentResultData) return;
     const entry = {
         date: currentResultData.isoDate,
-        пробег: currentResultData.пробег.toFixed(2),
         остатокВыезд: currentResultData.остатокВыезд.toFixed(2),
+        пробег: currentResultData.пробег.toFixed(2),
         заправлено: currentResultData.заправлено.toFixed(2),
         остатокВозврат: currentResultData.остатокВозврат.toFixed(2),
         расход: currentResultData.расход,
@@ -391,14 +429,15 @@ function renderHistory() {
         return;
     }
     history.sort((a, b) => b.timestamp - a.timestamp);
-    let html = '<table><thead><tr><th>Дата</th><th>Пробег</th><th>Расход общ.</th><th>Расход/100км</th><th>Норма</th><th>Сезон</th><th></th></tr></thead><tbody>';
+    let html = '<table><thead><tr><th>Дата</th><th>Выезд</th><th>Пробег</th><th>Расход общ.</th><th>Расход/100км</th><th>Норма</th><th>Сезон</th><th></th></tr></thead><tbody>';
     history.forEach((entry, index) => {
-        const probegStr = (entry.cityKm || entry.highwayKm) 
-            ? `${entry.пробег} км (г${entry.cityKm?.toFixed(1)||0} + т${entry.highwayKm?.toFixed(1)||0})` 
-            : `${entry.пробег} км`;
+        const probegStr = (entry.cityKm || entry.highwayKm)
+            ? `${entry.пробег} (г${entry.cityKm?.toFixed(1)||0}+т${entry.highwayKm?.toFixed(1)||0})`
+            : `${entry.пробег}`;
         html += `<tr>
             <td>${entry.date}</td>
-            <td>${probegStr}</td>
+            <td>${entry.остатокВыезд} л</td>
+            <td>${probegStr} км</td>
             <td>${entry.расход} л</td>
             <td>${entry.расходНа100км} л</td>
             <td>${entry.норма} л</td>
