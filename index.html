@@ -11,80 +11,76 @@
     <div class="container">
         <h1>📄 Калькулятор путевых листов</h1>
 
-        <!-- НАСТРОЙКИ НОРМ -->
-        <div class="settings-panel">
-            <h3>⚙️ Нормы (л/100км)</h3>
-            <div class="norm-row">
-                <span>🏙️ Город:</span>
-                <label>Лето <input type="number" id="normCitySummer" value="11.0" step="0.1"></label>
-                <label>Зима <input type="number" id="normCityWinter" value="13.0" step="0.1"></label>
+        <!-- Нормы и сезон в одной строке -->
+        <div class="norms-compact">
+            <div class="norm-block">
+                <span>🏙️ Город</span>
+                <label>Л <input type="number" id="normCitySummer" value="11.0" step="0.1"></label>
+                <label>З <input type="number" id="normCityWinter" value="13.0" step="0.1"></label>
             </div>
-            <div class="norm-row">
-                <span>🛣️ Трасса:</span>
-                <label>Лето <input type="number" id="normHwySummer" value="9.0" step="0.1"></label>
-                <label>Зима <input type="number" id="normHwyWinter" value="11.0" step="0.1"></label>
+            <div class="norm-block">
+                <span>🛣️ Трасса</span>
+                <label>Л <input type="number" id="normHwySummer" value="9.0" step="0.1"></label>
+                <label>З <input type="number" id="normHwyWinter" value="11.0" step="0.1"></label>
             </div>
-            <div class="season-row">
-                <span>📅 Сезон:</span>
-                <label><input type="radio" name="season" value="auto" checked> Авто</label>
-                <label><input type="radio" name="season" value="winter"> ❄️ Зима</label>
-                <label><input type="radio" name="season" value="summer"> ☀️ Лето</label>
+            <div class="season-inline">
+                <span>📅</span>
+                <label><input type="radio" name="season" value="auto" checked> А</label>
+                <label><input type="radio" name="season" value="winter"> ❄️</label>
+                <label><input type="radio" name="season" value="summer"> ☀️</label>
+                <div id="weatherInfo" class="weather-info"></div>
             </div>
-            <div id="weatherInfo" class="weather-info"></div>
         </div>
 
-        <!-- КАМЕРА ДЛЯ ДАТЫ -->
+        <!-- Мини-камера для даты -->
         <div class="camera-mini">
-            <div class="camera-preview">
-                <video id="video" playsinline autoplay></video>
-                <button id="scanDateBtn" disabled>📸 Сканировать дату</button>
-            </div>
+            <video id="video" playsinline autoplay></video>
+            <button id="scanDateBtn" disabled>📸</button>
             <div id="scanStatus" class="scan-status"></div>
         </div>
 
-        <!-- ПОЛЯ ВВОДА -->
+        <!-- Поля ввода в два столбца -->
         <div class="input-grid">
             <div class="input-item">
-                <label>📅 Дата:</label>
+                <label>📅 Дата</label>
                 <input type="date" id="dateInput">
             </div>
             <div class="input-item">
-                <label>⛽ Остаток при выезде (л):</label>
+                <label>⛽ Выезд (л)</label>
                 <input type="number" id="startFuel" step="0.1" placeholder="0">
                 <small id="startFuelHint"></small>
             </div>
             <div class="input-item">
-                <label>🏁 Остаток при возврате (л):</label>
+                <label>🏁 Возврат (л)</label>
                 <input type="number" id="endFuel" step="0.1" placeholder="0">
             </div>
             <div class="input-item">
-                <label>🏙️ Пробег город (км):</label>
+                <label>🏙️ Город (км)</label>
                 <input type="number" id="cityKm" step="0.1" placeholder="0">
             </div>
             <div class="input-item">
-                <label>🛣️ Пробег трасса (км):</label>
+                <label>🛣️ Трасса (км)</label>
                 <input type="number" id="highwayKm" step="0.1" placeholder="0">
             </div>
             <div class="input-item">
-                <label>🛢️ Заправлено (л):</label>
+                <label>🛢️ Заправ (л)</label>
                 <input type="number" id="fuelAdded" step="0.1" placeholder="0">
             </div>
         </div>
 
-        <!-- РЕЗУЛЬТАТЫ (живые) -->
-        <div id="resultsBlock" class="results-live">
-            <h3>📊 Расчёт</h3>
+        <!-- Живые результаты -->
+        <div id="resultsBlock" class="results-compact">
             <div id="liveResults"></div>
         </div>
 
-        <!-- КНОПКИ -->
+        <!-- Кнопки -->
         <div class="btn-group">
-            <button id="saveBtn">💾 Сохранить в историю</button>
+            <button id="saveBtn">💾 Сохранить</button>
             <button id="historyBtn" class="secondary">📋 История</button>
         </div>
     </div>
 
-    <!-- МОДАЛЬНОЕ ОКНО ИСТОРИИ -->
+    <!-- Модальное окно истории -->
     <div id="historyModal" class="modal">
         <div class="modal-content">
             <span class="close" id="closeHistoryModal">&times;</span>
