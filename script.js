@@ -107,7 +107,6 @@ function savePointsHistory(arr) {
 function renderPoints() {
     try {
         const points = getPointsHistory();
-        // Сортировка: по дате, затем по времени добавления
         points.sort((a, b) => a.date.localeCompare(b.date) || (a.timestamp || 0) - (b.timestamp || 0));
         let total = 0;
         let html = '<table><tr><th>Дата</th><th>Кол-во</th><th></th></tr>';
@@ -299,10 +298,10 @@ function updateLiveResults() {
 
     liveResults.innerHTML = `
         <p style="margin:0 0 4px;">🚩 <b>Пробег:</b> ${odoStart.toFixed(1)} → ${odoEnd.toFixed(1)} км (за день: ${dayProbeg.toFixed(1)} км)</p>
-        <p style="margin:0 0 4px;">⛽ <b>Выезд:</b> ${fuelStart.toFixed(2)} л | 🛢️ <b>Заправ:</b> ${fuelAddedVal.toFixed(2)} л | 🏁 <b>Возврат:</b> ${calcReturn.toFixed(2)} л</p>
+        <p style="margin:0 0 4px;">⛽ <b>Выезд:</b> ${fuelStart.toFixed(2)} л | 🛢️ <b>Заправ:</b> ${fuelAddedVal.toFixed(2)} л | 🏁 <span class="highlight-red">Возврат: ${calcReturn.toFixed(2)} л</span></p>
         <p style="margin:0 0 4px;">${season === 'winter' ? '❄️' : '☀️'} Нормы: г.${norms.city.toFixed(1)} / т.${norms.hwy.toFixed(1)}</p>
         <p style="margin:0 0 4px;">📊 Норм. расход: город ${normCityL.toFixed(2)} + трасса ${normHwyL.toFixed(2)} = <b>${normTotal.toFixed(2)} л</b> (ср. ${avgNorm.toFixed(2)})</p>
-        <p style="margin:0 0 4px;">🛞 <b>Факт. расход:</b> ${factFuel.toFixed(2)} л (${fact100.toFixed(2)} л/100км)</p>
+        <p style="margin:0 0 4px;">🛞 <span class="highlight-red">Факт. расход: ${factFuel.toFixed(2)} л (${fact100.toFixed(2)} л/100км)</span></p>
     `;
 
     updateHints();
