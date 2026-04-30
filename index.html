@@ -107,10 +107,11 @@
     </div>
 
     <script src="script.js"></script>
-    <!-- Регистрация Service Worker -->
+    <!-- Регистрация Service Worker (исправлен путь) -->
     <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js')
+      // Используем относительный путь, чтобы работало в подпапке
+      navigator.serviceWorker.register('./sw.js')
         .then(() => console.log('SW registered'));
     }
     </script>
