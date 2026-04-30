@@ -6,6 +6,9 @@
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#007aff",
+    "orientation": "portrait",
+    "categories": ["productivity", "utilities"],
+    "lang": "ru",
     "icons": [
         {
             "src": "icon-512.png",
@@ -15,6 +18,13 @@
         {
             "src": "icon-192.png",
             "sizes": "192x192",
+            "type": "image/png"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "screenshot1.png",
+            "sizes": "1080x1920",
             "type": "image/png"
         }
     ]
