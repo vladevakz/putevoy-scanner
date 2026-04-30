@@ -107,5 +107,12 @@
     </div>
 
     <script src="script.js"></script>
+    <!-- Регистрация Service Worker -->
+    <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then(() => console.log('SW registered'));
+    }
+    </script>
 </body>
 </html>
