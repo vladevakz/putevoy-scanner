@@ -49,6 +49,14 @@ h1 { font-size: 1.4em; margin: 0 0 12px; font-weight: 600; }
     background: #f9f9f9; border-radius: 8px; padding: 10px;
     margin-bottom: 12px; font-size: 14px; text-align: center; line-height: 1.5;
 }
+
+/* Новый класс для выделения красным */
+.highlight-red {
+    color: #d32f2f;
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
 .btn-group { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
 button {
     background: #007aff; color: white; border: none;
@@ -72,7 +80,6 @@ button:disabled { background: #aaa; cursor: not-allowed; }
 }
 .close { color: #aaa; float: right; font-size: 24px; cursor: pointer; line-height: 1; }
 
-/* Стили для формы точек */
 .points-form {
     display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;
 }
