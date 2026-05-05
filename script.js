@@ -402,7 +402,7 @@ saveBtn.addEventListener('click', () => {
     historyModal.style.display = 'flex';
 });
 
-// ===== ОТОБРАЖЕНИЕ ИСТОРИИ С ФИЛЬТРОМ (добавлены итоги) =====
+// ===== ОТОБРАЖЕНИЕ ИСТОРИИ С ФИЛЬТРОМ (добавлены итоги по городу/трассе) =====
 function renderHistory(month) {
     const history = getHistory();
     if (!history.length) { historyList.innerHTML = '<p>История пуста.</p>'; return; }
@@ -419,7 +419,8 @@ function renderHistory(month) {
     }
 
     let html = '<table><tr><th>Дата</th><th>Пробег нач.</th><th>Конец</th><th>Город</th><th>Трасса</th><th>Выезд</th><th>Возврат</th><th>Расход</th></tr>';
-    let totalProbeg = 0;
+    let totalCity = 0;
+    let totalHwy = 0;
     let totalFuel = 0;
 
     filtered.forEach((e, i) => {
@@ -427,7 +428,8 @@ function renderHistory(month) {
         const city = parseFloat(e.город) || 0;
         const hwy = parseFloat(e.трасса) || 0;
         const fuel = parseFloat(e.заправлено) || 0;
-        totalProbeg += city + hwy;
+        totalCity += city;
+        totalHwy += hwy;
         totalFuel += fuel;
 
         html += `<tr>
@@ -441,9 +443,10 @@ function renderHistory(month) {
 
     html += '</table>';
 
-    // Строка с итогами
-    html += `<div style="margin-top:8px; font-weight:bold;">
-        📏 Общий пробег: ${totalProbeg.toFixed(1)} км | ⛽ Всего заправлено: ${totalFuel.toFixed(2)} л
+    // Итоги с разделением город/трасса
+    html += `<div style="margin-top:8px; font-weight:bold; font-size:14px;">
+        🏙️ Город: ${totalCity.toFixed(1)} км | 🛣️ Трасса: ${totalHwy.toFixed(1)} км | 📏 Общий: ${(totalCity + totalHwy).toFixed(1)} км<br>
+        ⛽ Заправлено: ${totalFuel.toFixed(2)} л
     </div>`;
 
     historyList.innerHTML = html;
