@@ -334,10 +334,8 @@ function updateHints() {
 
 // ===== ФИЛЬТР МЕСЯЦА (sessionStorage) =====
 function getSelectedMonth() {
-    // sessionStorage хранит строку YYYY-MM
     const saved = sessionStorage.getItem('historyMonth');
     if (saved) return saved;
-    // По умолчанию текущий месяц
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
@@ -346,7 +344,7 @@ function setSelectedMonth(month) {
     sessionStorage.setItem('historyMonth', month);
 }
 
-// ===== СОХРАНЕНИЕ =====
+// ===== СОХРАНЕНИЕ (с очисткой полей) =====
 saveBtn.addEventListener('click', () => {
     const odoStart = parseFloat(startOdometer.value) || 0;
     const cityVal = parseFloat(cityKm.value) || 0;
@@ -377,6 +375,13 @@ saveBtn.addEventListener('click', () => {
     history.push(entry);
     saveHistory(history);
     alert('✅ Сохранено!');
+
+    // Очищаем поля дневного пробега и заправки
+    cityKm.value = '0';
+    highwayKm.value = '0';
+    fuelAdded.value = '0';
+
+    // Обновляем пробег и выезд из истории (для завтрашнего дня)
     setStartOdometerFromHistory();
     setStartFuelFromHistory();
     updateLiveResults();
@@ -393,7 +398,6 @@ function renderHistory(month) {
     const history = getHistory();
     if (!history.length) { historyList.innerHTML = '<p>История пуста.</p>'; return; }
 
-    // Фильтруем записи, у которых дата начинается с month (YYYY-MM)
     const filtered = history.filter(entry => {
         if (!entry.date) return false;
         return entry.date.startsWith(month);
@@ -407,12 +411,13 @@ function renderHistory(month) {
 
     let html = '<table><tr><th>Дата</th><th>Пробег нач.</th><th>Конец</th><th>Город</th><th>Трасса</th><th>Выезд</th><th>Возврат</th><th>Расход</th></tr>';
     filtered.forEach((e, i) => {
+        const fullIndex = history.indexOf(e);
         html += `<tr>
             <td>${e.date}</td><td>${e.начальныйПробег}</td><td>${e.конечныйПробег}</td>
             <td>${e.город || 0}</td><td>${e.трасса || 0}</td>
             <td>${e.остатокВыезд}</td><td>${e.остатокВозврат}</td>
             <td>${e.расход}</td>
-            <td><button class="delete-entry" data-index="${i}" data-full-index="${history.indexOf(e)}">🗑</button></td>
+            <td><button class="delete-entry" data-full-index="${fullIndex}">🗑</button></td>
         </tr>`;
     });
     html += '</table>';
@@ -420,7 +425,6 @@ function renderHistory(month) {
 
     document.querySelectorAll('.delete-entry').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            // Используем сохранённый индекс в оригинальном массиве
             const fullIndex = parseInt(e.target.getAttribute('data-full-index'));
             deleteHistoryEntry(fullIndex, month);
         });
@@ -501,6 +505,5 @@ window.addEventListener('DOMContentLoaded', async () => {
     setStartFuelFromHistory();
     currentWeatherSeason = await updateWeather();
     updateLiveResults();
-    // Установим значение месяца по умолчанию в поле (при открытии страницы)
     historyMonth.value = getSelectedMonth();
 });
