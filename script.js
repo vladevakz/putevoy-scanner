@@ -344,6 +344,15 @@ function setSelectedMonth(month) {
     sessionStorage.setItem('historyMonth', month);
 }
 
+// ===== АВТОВЫДЕЛЕНИЕ НУЛЯ ПРИ ФОКУСЕ =====
+document.querySelectorAll('input[type="number"]').forEach(input => {
+    input.addEventListener('focus', function() {
+        if (this.value === '0') {
+            this.select();
+        }
+    });
+});
+
 // ===== СОХРАНЕНИЕ (с очисткой полей) =====
 saveBtn.addEventListener('click', () => {
     const odoStart = parseFloat(startOdometer.value) || 0;
