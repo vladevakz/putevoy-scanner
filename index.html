@@ -5,12 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Калькулятор путевых листов</title>
     
-    <!-- Подтверждение права на сайт для Admitad -->
     <meta name="verify-admitad" content="e1eb6806fb" />
-   
-    <!-- Ссылка на манифест PWA -->
     <link rel="manifest" href="manifest.json">
-
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -85,6 +81,11 @@
         <div class="modal-content">
             <span class="close" id="closeHistoryModal">&times;</span>
             <h2>📚 Сохранённые расчёты</h2>
+            <!-- Фильтр по месяцу -->
+            <div class="history-filter">
+                <label for="historyMonth">Месяц:</label>
+                <input type="month" id="historyMonth">
+            </div>
             <div id="historyList"></div>
             <button id="clearHistoryBtn" class="danger">🗑 Очистить историю</button>
         </div>
@@ -107,17 +108,11 @@
     </div>
 
     <script src="script.js"></script>
-    <!-- Регистрация Service Worker -->
     <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js')
         .then(() => console.log('SW registered'));
     }
     </script>
-
-    <!-- Рекламный скрипт Profitable CPM Network -->
-    
-    <script src="https://pl29313125.profitablecpmratenetwork.com/92/3a/94/923a94a0b03c3636d7ad57da489aa79e.js"></script>
-    
 </body>
 </html>
