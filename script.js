@@ -344,11 +344,11 @@ function setSelectedMonth(month) {
     sessionStorage.setItem('historyMonth', month);
 }
 
-// ===== АВТОВЫДЕЛЕНИЕ НУЛЯ ПРИ ФОКУСЕ =====
+// ===== АВТООЧИСТКА НУЛЯ ПРИ ФОКУСЕ =====
 document.querySelectorAll('input[type="number"]').forEach(input => {
     input.addEventListener('focus', function() {
         if (this.value === '0') {
-            this.select();
+            this.value = '';
         }
     });
 });
