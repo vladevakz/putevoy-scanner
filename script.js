@@ -23,6 +23,7 @@ const historyModal = document.getElementById('historyModal');
 const closeHistoryModal = document.getElementById('closeHistoryModal');
 const historyList = document.getElementById('historyList');
 const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+const historyMonth = document.getElementById('historyMonth');
 
 // Точки
 const pointsBtn = document.getElementById('pointsBtn');
@@ -331,6 +332,20 @@ function updateHints() {
     }
 }
 
+// ===== ФИЛЬТР МЕСЯЦА (sessionStorage) =====
+function getSelectedMonth() {
+    // sessionStorage хранит строку YYYY-MM
+    const saved = sessionStorage.getItem('historyMonth');
+    if (saved) return saved;
+    // По умолчанию текущий месяц
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function setSelectedMonth(month) {
+    sessionStorage.setItem('historyMonth', month);
+}
+
 // ===== СОХРАНЕНИЕ =====
 saveBtn.addEventListener('click', () => {
     const odoStart = parseFloat(startOdometer.value) || 0;
@@ -365,48 +380,86 @@ saveBtn.addEventListener('click', () => {
     setStartOdometerFromHistory();
     setStartFuelFromHistory();
     updateLiveResults();
+
+    // Открываем историю с текущим выбранным месяцем
+    const month = getSelectedMonth();
+    historyMonth.value = month;
+    renderHistory(month);
+    historyModal.style.display = 'flex';
 });
 
-// ===== МОДАЛЬНЫЕ ОКНА ИСТОРИИ И ТОЧЕК =====
-function renderHistory() {
+// ===== ОТОБРАЖЕНИЕ ИСТОРИИ С ФИЛЬТРОМ =====
+function renderHistory(month) {
     const history = getHistory();
     if (!history.length) { historyList.innerHTML = '<p>История пуста.</p>'; return; }
-    history.sort((a, b) => b.timestamp - a.timestamp);
+
+    // Фильтруем записи, у которых дата начинается с month (YYYY-MM)
+    const filtered = history.filter(entry => {
+        if (!entry.date) return false;
+        return entry.date.startsWith(month);
+    });
+    filtered.sort((a, b) => b.timestamp - a.timestamp);
+
+    if (filtered.length === 0) {
+        historyList.innerHTML = '<p>Нет записей за этот месяц.</p>';
+        return;
+    }
+
     let html = '<table><tr><th>Дата</th><th>Пробег нач.</th><th>Конец</th><th>Город</th><th>Трасса</th><th>Выезд</th><th>Возврат</th><th>Расход</th></tr>';
-    history.forEach((e, i) => {
+    filtered.forEach((e, i) => {
         html += `<tr>
             <td>${e.date}</td><td>${e.начальныйПробег}</td><td>${e.конечныйПробег}</td>
             <td>${e.город || 0}</td><td>${e.трасса || 0}</td>
             <td>${e.остатокВыезд}</td><td>${e.остатокВозврат}</td>
             <td>${e.расход}</td>
-            <td><button class="delete-entry" data-index="${i}">🗑</button></td>
+            <td><button class="delete-entry" data-index="${i}" data-full-index="${history.indexOf(e)}">🗑</button></td>
         </tr>`;
     });
     html += '</table>';
     historyList.innerHTML = html;
+
     document.querySelectorAll('.delete-entry').forEach(btn => {
-        btn.addEventListener('click', (e) => deleteHistoryEntry(parseInt(e.target.getAttribute('data-index'))));
+        btn.addEventListener('click', (e) => {
+            // Используем сохранённый индекс в оригинальном массиве
+            const fullIndex = parseInt(e.target.getAttribute('data-full-index'));
+            deleteHistoryEntry(fullIndex, month);
+        });
     });
 }
 
-function deleteHistoryEntry(idx) {
+function deleteHistoryEntry(fullIndex, month) {
     const history = getHistory();
-    history.sort((a, b) => b.timestamp - a.timestamp);
-    history.splice(idx, 1);
-    saveHistory(history);
-    renderHistory();
-    setStartOdometerFromHistory();
-    setStartFuelFromHistory();
-    updateLiveResults();
+    if (fullIndex >= 0 && fullIndex < history.length) {
+        history.splice(fullIndex, 1);
+        saveHistory(history);
+        renderHistory(month);
+        setStartOdometerFromHistory();
+        setStartFuelFromHistory();
+        updateLiveResults();
+    }
 }
 
-historyBtn.addEventListener('click', () => { renderHistory(); historyModal.style.display = 'flex'; });
+// ===== ОТКРЫТИЕ ИСТОРИИ ПО КНОПКЕ =====
+historyBtn.addEventListener('click', () => {
+    const month = getSelectedMonth();
+    historyMonth.value = month;
+    renderHistory(month);
+    historyModal.style.display = 'flex';
+});
+
+// ===== ЗАКРЫТИЕ МОДАЛЬНОГО ОКНА =====
 closeHistoryModal.addEventListener('click', () => historyModal.style.display = 'none');
+window.addEventListener('click', (e) => {
+    if (e.target === historyModal) historyModal.style.display = 'none';
+    if (e.target === pointsModal) pointsModal.style.display = 'none';
+});
+
+// ===== ОЧИСТКА ВСЕЙ ИСТОРИИ =====
 clearHistoryBtn.addEventListener('click', () => {
     if (confirm('Удалить всю историю расчётов?')) {
         try {
             localStorage.removeItem('putevoyHistory');
-            renderHistory();
+            renderHistory(getSelectedMonth());
             setStartOdometerFromHistory();
             setStartFuelFromHistory();
             updateLiveResults();
@@ -416,17 +469,20 @@ clearHistoryBtn.addEventListener('click', () => {
     }
 });
 
+// ===== ФИЛЬТР МЕСЯЦА (изменение) =====
+historyMonth.addEventListener('change', () => {
+    const month = historyMonth.value;
+    setSelectedMonth(month);
+    renderHistory(month);
+});
+
+// ===== ТОЧКИ (без изменений) =====
 pointsBtn.addEventListener('click', () => {
     pointDate.value = new Date().toISOString().split('T')[0];
     renderPoints();
     pointsModal.style.display = 'flex';
 });
 closePointsModal.addEventListener('click', () => pointsModal.style.display = 'none');
-
-window.addEventListener('click', (e) => {
-    if (e.target === historyModal) historyModal.style.display = 'none';
-    if (e.target === pointsModal) pointsModal.style.display = 'none';
-});
 
 // ===== СЛУШАТЕЛИ ПОЛЕЙ =====
 document.querySelectorAll('#startOdometer, #startFuel, #cityKm, #highwayKm, #fuelAdded, #dateInput').forEach(input => {
@@ -445,4 +501,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     setStartFuelFromHistory();
     currentWeatherSeason = await updateWeather();
     updateLiveResults();
+    // Установим значение месяца по умолчанию в поле (при открытии страницы)
+    historyMonth.value = getSelectedMonth();
 });
