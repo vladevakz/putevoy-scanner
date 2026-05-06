@@ -86,7 +86,12 @@
                 <input type="month" id="historyMonth">
             </div>
             <div id="historyList"></div>
-            <button id="clearHistoryBtn" class="danger">🗑 Очистить историю</button>
+            <div class="history-actions">
+                <button id="exportBtn" class="secondary">📤 Экспорт</button>
+                <button id="importBtn" class="secondary">📥 Импорт</button>
+                <input type="file" id="importFile" accept=".json" style="display:none">
+                <button id="clearHistoryBtn" class="danger">🗑 Очистить историю</button>
+            </div>
         </div>
     </div>
 
@@ -95,12 +100,10 @@
         <div class="modal-content">
             <span class="close" id="closePointsModal">&times;</span>
             <h2>📌 Ежедневные точки</h2>
-            <!-- Настройки -->
             <div class="points-settings">
                 <label>💰 Цена за точку (₽): <input type="number" id="pointPrice" value="8" step="0.01" min="0"></label>
                 <label>🎯 Цель (₽): <input type="number" id="pointTarget" value="1800" step="1" min="0"></label>
             </div>
-            <!-- Добавление записи -->
             <div class="points-form">
                 <input type="date" id="pointDate">
                 <input type="number" id="pointCount" placeholder="Кол-во" min="0" step="1">
@@ -119,7 +122,5 @@
         .then(() => console.log('SW registered'));
     }
     </script>
-    <script src="https://pl29313125.profitablecpmratenetwork.com/92/3a/94/923a94a0b03c3636d7ad57da489aa79e.js"></script>
-    
 </body>
 </html>
