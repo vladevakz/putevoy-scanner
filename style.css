@@ -87,6 +87,10 @@ button:disabled { background: #aaa; cursor: not-allowed; }
     padding: 5px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px;
 }
 
+.history-actions {
+    display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap;
+}
+
 .points-settings {
     display: flex; gap: 12px; align-items: center; margin-bottom: 12px;
     flex-wrap: wrap;
