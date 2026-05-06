@@ -35,6 +35,8 @@ const addPointBtn = document.getElementById('addPointBtn');
 const pointsList = document.getElementById('pointsList');
 const pointsTotalDiv = document.getElementById('pointsTotal');
 const clearPointsBtn = document.getElementById('clearPointsBtn');
+const pointPrice = document.getElementById('pointPrice');
+const pointTarget = document.getElementById('pointTarget');
 
 let currentWeatherSeason = 'summer';
 
@@ -86,7 +88,7 @@ function saveHistory(arr) {
     }
 }
 
-// ===== ТОЧКИ =====
+// ===== ТОЧКИ (обновлено) =====
 function getPointsHistory() {
     try {
         const raw = localStorage.getItem('pointsHistory');
@@ -105,23 +107,52 @@ function savePointsHistory(arr) {
     }
 }
 
+// Сохраняем цену и цель
+function savePointsSettings() {
+    try {
+        localStorage.setItem('pointPrice', pointPrice.value);
+        localStorage.setItem('pointTarget', pointTarget.value);
+    } catch (e) {}
+}
+function loadPointsSettings() {
+    const savedPrice = localStorage.getItem('pointPrice');
+    const savedTarget = localStorage.getItem('pointTarget');
+    if (savedPrice !== null) pointPrice.value = savedPrice;
+    if (savedTarget !== null) pointTarget.value = savedTarget;
+}
+pointPrice.addEventListener('input', () => { savePointsSettings(); renderPoints(); });
+pointTarget.addEventListener('input', () => { savePointsSettings(); renderPoints(); });
+
 function renderPoints() {
     try {
         const points = getPointsHistory();
         points.sort((a, b) => a.date.localeCompare(b.date) || (a.timestamp || 0) - (b.timestamp || 0));
-        let total = 0;
-        let html = '<table><tr><th>Дата</th><th>Кол-во</th><th></th></tr>';
+        const price = parseFloat(pointPrice.value) || 0;
+        const target = parseFloat(pointTarget.value) || 0;
+
+        let totalPoints = 0;
+        let totalSum = 0;
+        let html = '<table><tr><th>Дата</th><th>Кол-во</th><th>Сумма</th><th></th></tr>';
         points.forEach((p, i) => {
-            total += p.count;
+            totalPoints += p.count;
+            const daySum = p.count * price;
+            totalSum += daySum;
             html += `<tr>
                 <td>${p.date}</td>
                 <td>${p.count}</td>
+                <td>${daySum.toFixed(2)} ₽</td>
                 <td><button class="delete-point" data-index="${i}">🗑</button></td>
             </tr>`;
         });
         html += '</table>';
         pointsList.innerHTML = html;
-        pointsTotalDiv.textContent = `Всего точек: ${total}`;
+
+        const remaining = target - totalSum;
+        let targetLine = '';
+        if (target > 0) {
+            targetLine = ` | 🎯 Цель: ${target.toFixed(2)} ₽ | ${remaining > 0 ? '❌ Осталось: ' + remaining.toFixed(2) + ' ₽' : '✅ Достигнута!'}`;
+        }
+        pointsTotalDiv.textContent = `Всего точек: ${totalPoints} | Сумма: ${totalSum.toFixed(2)} ₽${targetLine}`;
 
         document.querySelectorAll('.delete-point').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -385,24 +416,21 @@ saveBtn.addEventListener('click', () => {
     saveHistory(history);
     alert('✅ Сохранено!');
 
-    // Очищаем поля дневного пробега и заправки
     cityKm.value = '0';
     highwayKm.value = '0';
     fuelAdded.value = '0';
 
-    // Обновляем пробег и выезд из истории (для завтрашнего дня)
     setStartOdometerFromHistory();
     setStartFuelFromHistory();
     updateLiveResults();
 
-    // Открываем историю с текущим выбранным месяцем
     const month = getSelectedMonth();
     historyMonth.value = month;
     renderHistory(month);
     historyModal.style.display = 'flex';
 });
 
-// ===== ОТОБРАЖЕНИЕ ИСТОРИИ С ФИЛЬТРОМ (добавлены итоги по городу/трассе) =====
+// ===== ОТОБРАЖЕНИЕ ИСТОРИИ С ФИЛЬТРОМ =====
 function renderHistory(month) {
     const history = getHistory();
     if (!history.length) { historyList.innerHTML = '<p>История пуста.</p>'; return; }
@@ -443,7 +471,6 @@ function renderHistory(month) {
 
     html += '</table>';
 
-    // Итоги с разделением город/трасса
     html += `<div style="margin-top:8px; font-weight:bold; font-size:14px;">
         🏙️ Город: ${totalCity.toFixed(1)} км | 🛣️ Трасса: ${totalHwy.toFixed(1)} км | 📏 Общий: ${(totalCity + totalHwy).toFixed(1)} км<br>
         ⛽ Заправлено: ${totalFuel.toFixed(2)} л
@@ -479,14 +506,12 @@ historyBtn.addEventListener('click', () => {
     historyModal.style.display = 'flex';
 });
 
-// ===== ЗАКРЫТИЕ МОДАЛЬНОГО ОКНА =====
 closeHistoryModal.addEventListener('click', () => historyModal.style.display = 'none');
 window.addEventListener('click', (e) => {
     if (e.target === historyModal) historyModal.style.display = 'none';
     if (e.target === pointsModal) pointsModal.style.display = 'none';
 });
 
-// ===== ОЧИСТКА ВСЕЙ ИСТОРИИ =====
 clearHistoryBtn.addEventListener('click', () => {
     if (confirm('Удалить всю историю расчётов?')) {
         try {
@@ -501,14 +526,12 @@ clearHistoryBtn.addEventListener('click', () => {
     }
 });
 
-// ===== ФИЛЬТР МЕСЯЦА (изменение) =====
 historyMonth.addEventListener('change', () => {
     const month = historyMonth.value;
     setSelectedMonth(month);
     renderHistory(month);
 });
 
-// ===== ТОЧКИ (без изменений) =====
 pointsBtn.addEventListener('click', () => {
     pointDate.value = new Date().toISOString().split('T')[0];
     renderPoints();
@@ -516,7 +539,6 @@ pointsBtn.addEventListener('click', () => {
 });
 closePointsModal.addEventListener('click', () => pointsModal.style.display = 'none');
 
-// ===== СЛУШАТЕЛИ ПОЛЕЙ =====
 document.querySelectorAll('#startOdometer, #startFuel, #cityKm, #highwayKm, #fuelAdded, #dateInput').forEach(input => {
     input.addEventListener('input', updateLiveResults);
 });
@@ -525,7 +547,6 @@ seasonRadios.forEach(r => r.addEventListener('change', async () => {
     updateLiveResults();
 }));
 
-// ===== СТАРТ =====
 window.addEventListener('DOMContentLoaded', async () => {
     loadNormValues();
     dateInput.value = new Date().toISOString().split('T')[0];
@@ -534,4 +555,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     currentWeatherSeason = await updateWeather();
     updateLiveResults();
     historyMonth.value = getSelectedMonth();
+    loadPointsSettings();   // загружаем цену и цель
+    // рендерить точки не обязательно до открытия окна
 });
