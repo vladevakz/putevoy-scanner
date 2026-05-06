@@ -86,8 +86,9 @@ button:disabled { background: #aaa; cursor: not-allowed; }
 .history-filter label,
 .points-filter label { font-size: 14px; }
 .history-filter input[type="month"],
-.points-filter input[type="month"] {
+.points-filter select {
     padding: 5px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px;
+    background: white;
 }
 
 .history-actions {
