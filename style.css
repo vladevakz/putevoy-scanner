@@ -79,7 +79,6 @@ button:disabled { background: #aaa; cursor: not-allowed; }
 }
 .close { color: #aaa; float: right; font-size: 24px; cursor: pointer; line-height: 1; }
 
-/* Фильтр месяца */
 .history-filter {
     display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
 }
@@ -88,6 +87,17 @@ button:disabled { background: #aaa; cursor: not-allowed; }
     padding: 5px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px;
 }
 
+.points-settings {
+    display: flex; gap: 12px; align-items: center; margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+.points-settings label {
+    font-size: 13px; display: flex; align-items: center; gap: 4px;
+}
+.points-settings input[type="number"] {
+    width: 80px; padding: 5px; border-radius: 6px;
+    border: 1px solid #ccc; font-size: 14px;
+}
 .points-form {
     display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;
 }
