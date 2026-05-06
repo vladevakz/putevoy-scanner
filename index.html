@@ -68,6 +68,9 @@
             <div id="liveResults">Введите данные</div>
         </div>
 
+        <!-- Динамический рекламный блок (управляется из админки) -->
+        <div id="adContainer"></div>
+
         <!-- Кнопки -->
         <div class="btn-group">
             <button id="saveBtn">💾 Сохранить</button>
@@ -125,6 +128,29 @@
       navigator.serviceWorker.register('./sw.js')
         .then(() => console.log('SW registered'));
     }
+
+    // Загрузка рекламного кода из админки
+    (function() {
+        const adCode = localStorage.getItem('customAdCode');
+        if (adCode) {
+            const adContainer = document.getElementById('adContainer');
+            adContainer.innerHTML = adCode;
+            // Выполняем все <script> внутри
+            const scripts = adContainer.querySelectorAll('script');
+            scripts.forEach(oldScript => {
+                const newScript = document.createElement('script');
+                if (oldScript.src) {
+                    newScript.src = oldScript.src;
+                } else {
+                    newScript.textContent = oldScript.textContent;
+                }
+                Array.from(oldScript.attributes).forEach(attr => {
+                    newScript.setAttribute(attr.name, attr.value);
+                });
+                oldScript.parentNode.replaceChild(newScript, oldScript);
+            });
+        }
+    })();
     </script>
 </body>
 </html>
