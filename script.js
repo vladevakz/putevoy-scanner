@@ -41,7 +41,7 @@ const pointsTotalDiv = document.getElementById('pointsTotal');
 const clearPointsBtn = document.getElementById('clearPointsBtn');
 const pointPrice = document.getElementById('pointPrice');
 const pointTarget = document.getElementById('pointTarget');
-const pointsMonth = document.getElementById('pointsMonth');
+const pointsMonthSelect = document.getElementById('pointsMonthSelect');
 
 let currentWeatherSeason = 'summer';
 
@@ -98,10 +98,43 @@ function loadPointsSettings() {
     if (savedPrice !== null) pointPrice.value = savedPrice;
     if (savedTarget !== null) pointTarget.value = savedTarget;
 }
-pointPrice.addEventListener('input', () => { savePointsSettings(); renderPoints(getSelectedPointsMonth()); });
-pointTarget.addEventListener('input', () => { savePointsSettings(); renderPoints(getSelectedPointsMonth()); });
+pointPrice.addEventListener('input', () => { savePointsSettings(); renderPoints(); });
+pointTarget.addEventListener('input', () => { savePointsSettings(); renderPoints(); });
 
-// Месяц для точек (sessionStorage)
+// Управление списком месяцев
+function getAvailableMonths() {
+    const points = getPointsHistory();
+    const months = new Set();
+    points.forEach(p => {
+        if (p.date && p.date.length >= 7) {
+            months.add(p.date.substring(0, 7)); // YYYY-MM
+        }
+    });
+    return Array.from(months).sort();
+}
+
+function populateMonthSelect() {
+    const months = getAvailableMonths();
+    const currentValue = pointsMonthSelect.value || getSelectedPointsMonth();
+    pointsMonthSelect.innerHTML = '';
+    if (months.length === 0) {
+        const now = new Date();
+        const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        months.push(defaultMonth);
+    }
+    months.forEach(m => {
+        const option = document.createElement('option');
+        option.value = m;
+        option.textContent = m.replace('-', ' / '); // 2026-04 -> 2026 / 04
+        pointsMonthSelect.appendChild(option);
+    });
+    if (months.includes(currentValue)) {
+        pointsMonthSelect.value = currentValue;
+    } else {
+        pointsMonthSelect.value = months[months.length - 1]; // последний доступный
+    }
+}
+
 function getSelectedPointsMonth() {
     const saved = sessionStorage.getItem('pointsMonth');
     if (saved) return saved;
@@ -112,24 +145,23 @@ function setSelectedPointsMonth(month) {
     sessionStorage.setItem('pointsMonth', month);
 }
 
-function renderPoints(month) {
+// Рендер точек
+function renderPoints() {
+    const month = pointsMonthSelect.value || getSelectedPointsMonth();
+    setSelectedPointsMonth(month);
     try {
         const allPoints = getPointsHistory();
         const price = parseFloat(pointPrice.value) || 0;
         const target = parseFloat(pointTarget.value) || 0;
 
-        // Фильтрация по месяцу, если передан
-        let filtered = allPoints;
-        if (month) {
-            filtered = allPoints.filter(p => p.date && p.date.startsWith(month));
-        }
+        // Фильтр по месяцу
+        const filtered = allPoints.filter(p => p.date && p.date.startsWith(month));
         filtered.sort((a, b) => a.date.localeCompare(b.date) || (a.timestamp || 0) - (b.timestamp || 0));
 
-        // Итоги за месяц
         let monthPoints = 0;
         let monthSum = 0;
         let html = '<table><tr><th>Дата</th><th>Кол-во</th><th>Сумма</th><th></th></tr>';
-        filtered.forEach((p, i) => {
+        filtered.forEach((p) => {
             monthPoints += p.count;
             const daySum = p.count * price;
             monthSum += daySum;
@@ -143,7 +175,7 @@ function renderPoints(month) {
         html += '</table>';
         pointsList.innerHTML = html;
 
-        // Глобальные итоги (по всем записям)
+        // Общие итоги по всем записям
         let totalPoints = 0;
         let totalSum = 0;
         allPoints.forEach(p => { totalPoints += p.count; totalSum += p.count * price; });
@@ -156,15 +188,15 @@ function renderPoints(month) {
         }
 
         pointsTotalDiv.innerHTML = `
-            📅 За месяц: точек ${monthPoints}, сумма ${monthSum.toFixed(2)} ₽<br>
-            📊 Всего: точек ${totalPoints}, сумма ${totalSum.toFixed(2)} ₽${targetLine}
+            📅 <b>${month.replace('-', ' / ')}</b>: точек ${monthPoints}, сумма ${monthSum.toFixed(2)} ₽<br>
+            📊 <b>Всего</b>: точек ${totalPoints}, сумма ${totalSum.toFixed(2)} ₽${targetLine}
         `;
 
-        // Обработчики удаления (используем timestamp как уникальный идентификатор)
+        // Обработчики удаления
         document.querySelectorAll('.delete-point').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const ts = parseInt(e.target.getAttribute('data-timestamp'));
-                deletePointByTimestamp(ts, month);
+                deletePointByTimestamp(ts);
             });
         });
     } catch (e) {
@@ -173,15 +205,17 @@ function renderPoints(month) {
     }
 }
 
-function deletePointByTimestamp(timestamp, month) {
+function deletePointByTimestamp(timestamp) {
     try {
         const points = getPointsHistory();
         const newPoints = points.filter(p => p.timestamp !== timestamp);
         savePointsHistory(newPoints);
-        renderPoints(month);
+        populateMonthSelect();
+        renderPoints();
     } catch (e) { console.error(e); }
 }
 
+// Добавление точки
 addPointBtn.addEventListener('click', () => {
     const date = pointDate.value;
     const count = parseInt(pointCount.value);
@@ -193,18 +227,42 @@ addPointBtn.addEventListener('click', () => {
         points.push(entry);
         savePointsHistory(points);
         pointCount.value = '';
-        const month = getSelectedPointsMonth();
-        // Если добавленная дата за пределами выбранного месяца, пользователь может не увидеть запись,
-        // но мы оставляем текущий месяц, чтобы не прыгать.
-        renderPoints(month);
+        // Обновим список месяцев и выберем месяц добавленной даты
+        const addedMonth = date.substring(0, 7);
+        setSelectedPointsMonth(addedMonth);
+        populateMonthSelect();
+        if (pointsMonthSelect.querySelector(`option[value="${addedMonth}"]`)) {
+            pointsMonthSelect.value = addedMonth;
+        }
+        renderPoints();
     } catch (e) { alert('Не удалось добавить точку'); }
 });
 
+// Очистка всех точек
 clearPointsBtn.addEventListener('click', () => {
     if (confirm('Удалить все точки?')) {
-        try { savePointsHistory([]); renderPoints(getSelectedPointsMonth()); } catch (e) {}
+        try { savePointsHistory([]); populateMonthSelect(); renderPoints(); } catch (e) {}
     }
 });
+
+// Выбор месяца в селекте
+pointsMonthSelect.addEventListener('change', () => {
+    setSelectedPointsMonth(pointsMonthSelect.value);
+    renderPoints();
+});
+
+// Открытие окна точек
+pointsBtn.addEventListener('click', () => {
+    populateMonthSelect();
+    const savedMonth = getSelectedPointsMonth();
+    if (pointsMonthSelect.querySelector(`option[value="${savedMonth}"]`)) {
+        pointsMonthSelect.value = savedMonth;
+    }
+    pointDate.value = new Date().toISOString().split('T')[0];
+    renderPoints();
+    pointsModal.style.display = 'flex';
+});
+closePointsModal.addEventListener('click', () => pointsModal.style.display = 'none');
 
 // ===== ЭКСПОРТ / ИМПОРТ =====
 function exportAllData() {
@@ -265,7 +323,8 @@ function importAllData(file) {
             }
             alert('Импорт завершён! История объединена.');
             renderHistory(getSelectedMonth());
-            renderPoints(getSelectedPointsMonth());
+            populateMonthSelect();
+            renderPoints();
             updateLiveResults();
         } catch (err) {
             alert('Ошибка чтения файла');
@@ -468,4 +527,81 @@ function renderHistory(month) {
     filtered.sort((a, b) => b.timestamp - a.timestamp);
     if (filtered.length === 0) { historyList.innerHTML = '<p>Нет записей за этот месяц.</p>'; return; }
 
-    let html = '<table><tr><th>Дата</th><th>Пробе
+    let html = '<table><tr><th>Дата</th><th>Пробег нач.</th><th>Конец</th><th>Город</th><th>Трасса</th><th>Выезд</th><th>Возврат</th><th>Расход</th></tr>';
+    let totalCity = 0, totalHwy = 0, totalFuel = 0;
+    filtered.forEach(e => {
+        const fullIndex = history.indexOf(e);
+        const city = parseFloat(e.город) || 0;
+        const hwy = parseFloat(e.трасса) || 0;
+        const fuel = parseFloat(e.заправлено) || 0;
+        totalCity += city; totalHwy += hwy; totalFuel += fuel;
+        html += `<tr>
+            <td>${e.date}</td><td>${e.начальныйПробег}</td><td>${e.конечныйПробег}</td>
+            <td>${city.toFixed(1)}</td><td>${hwy.toFixed(1)}</td>
+            <td>${e.остатокВыезд}</td><td>${e.остатокВозврат}</td>
+            <td>${e.расход}</td>
+            <td><button class="delete-entry" data-full-index="${fullIndex}">🗑</button></td>
+        </tr>`;
+    });
+    html += '</table>';
+    html += `<div style="margin-top:8px;font-weight:bold;">🏙️ Город: ${totalCity.toFixed(1)} км | 🛣️ Трасса: ${totalHwy.toFixed(1)} км | 📏 Общий: ${(totalCity + totalHwy).toFixed(1)} км<br>⛽ Заправлено: ${totalFuel.toFixed(2)} л</div>`;
+    historyList.innerHTML = html;
+
+    document.querySelectorAll('.delete-entry').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const fullIndex = parseInt(e.target.getAttribute('data-full-index'));
+            deleteHistoryEntry(fullIndex, month);
+        });
+    });
+}
+
+function deleteHistoryEntry(fullIndex, month) {
+    const history = getHistory();
+    if (fullIndex >= 0 && fullIndex < history.length) {
+        history.splice(fullIndex, 1);
+        saveHistory(history);
+        renderHistory(month);
+        setStartOdometerFromHistory();
+        setStartFuelFromHistory();
+        updateLiveResults();
+    }
+}
+
+// ===== ОКНА =====
+historyBtn.addEventListener('click', () => {
+    const month = getSelectedMonth();
+    historyMonth.value = month;
+    renderHistory(month);
+    historyModal.style.display = 'flex';
+});
+closeHistoryModal.addEventListener('click', () => historyModal.style.display = 'none');
+window.addEventListener('click', (e) => {
+    if (e.target === historyModal) historyModal.style.display = 'none';
+    if (e.target === pointsModal) pointsModal.style.display = 'none';
+});
+clearHistoryBtn.addEventListener('click', () => {
+    if (confirm('Удалить всю историю расчётов?')) {
+        try { localStorage.removeItem('putevoyHistory'); renderHistory(getSelectedMonth()); setStartOdometerFromHistory(); setStartFuelFromHistory(); updateLiveResults(); } catch (e) {}
+    }
+});
+historyMonth.addEventListener('change', () => {
+    setSelectedMonth(historyMonth.value);
+    renderHistory(historyMonth.value);
+});
+
+// ===== СЛУШАТЕЛИ ПОЛЕЙ =====
+document.querySelectorAll('#startOdometer, #startFuel, #cityKm, #highwayKm, #fuelAdded, #dateInput').forEach(input => input.addEventListener('input', updateLiveResults));
+seasonRadios.forEach(r => r.addEventListener('change', async () => { currentWeatherSeason = await updateWeather(); updateLiveResults(); }));
+
+// ===== СТАРТ =====
+window.addEventListener('DOMContentLoaded', async () => {
+    loadNormValues();
+    dateInput.value = new Date().toISOString().split('T')[0];
+    setStartOdometerFromHistory();
+    setStartFuelFromHistory();
+    currentWeatherSeason = await updateWeather();
+    updateLiveResults();
+    historyMonth.value = getSelectedMonth();
+    loadPointsSettings();
+    // populateMonthSelect будет вызвано при открытии окна, сейчас не нужно
+});
