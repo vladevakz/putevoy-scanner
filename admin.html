@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Админка – Логи посещений</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 10px; background: #f5f5f5; }
+        h2 { color: #333; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        th, td { padding: 6px; border: 1px solid #ddd; text-align: left; }
+        th { background: #007aff; color: white; }
+        .hidden { display: none; }
+        #loginSection { text-align: center; margin: 50px auto; max-width: 300px; }
+        #loginSection input { padding: 10px; width: 100%; margin: 8px 0; border-radius: 6px; border: 1px solid #ccc; }
+        button { padding: 10px 20px; background: #007aff; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        #clearBtn { background: #dc3545; margin: 15px 0; }
+        .note { font-size: 10px; color: #888; text-align: center; }
+    </style>
+</head>
+<body>
+    <div id="loginSection">
+        <h2>🔒 Вход в админку</h2>
+        <input type="password" id="passwordInput" placeholder="Введите пароль">
+        <button onclick="checkPassword()">Войти</button>
+        <p class="note">Пароль по умолчанию: 1234</p>
+    </div>
+
+    <div id="contentSection" class="hidden">
+        <h2>📋 Логи посещений</h2>
+        <button id="clearBtn" onclick="clearLogs()">🗑 Очистить логи</button>
+        <button onclick="changePassword()">🔑 Сменить пароль</button>
+        <br><br>
+        <table id="logsTable">
+            <thead>
+                <tr>
+                    <th>Время</th>
+                    <th>IP</th>
+                    <th>Страна</th>
+                    <th>Регион</th>
+                    <th>Город</th>
+                    <th>Устройство</th>
+                    <th>Браузер</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <p class="note">Данные хранятся локально и не передаются третьим лицам.</p>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'visitLogs';
+        const PASSWORD_KEY = 'adminPassword';
+
+        function getLogs() {
+            try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e) { return []; }
+        }
+
+        function setLogs(logs) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+        }
+
+        function getPassword() {
+            return localStorage.getItem(PASSWORD_KEY) || '1234';
+        }
+
+        function setPassword(newPass) {
+            localStorage.setItem(PASSWORD_KEY, newPass);
+        }
+
+        function checkPassword() {
+            const inputPass = document.getElementById('passwordInput').value;
+            if (inputPass === getPassword()) {
+                document.getElementById('loginSection').classList.add('hidden');
+                document.getElementById('contentSection').classList.remove('hidden');
+                renderLogs();
+            } else {
+                alert('Неверный пароль');
+            }
+        }
+
+        function renderLogs() {
+            const logs = getLogs();
+            const tbody = document.querySelector('#logsTable tbody');
+            tbody.innerHTML = '';
+            logs.slice().reverse().forEach(log => {
+                const row = tbody.insertRow();
+                row.insertCell().textContent = log.time || '';
+                row.insertCell().textContent = log.ip || '';
+                row.insertCell().textContent = log.country || '';
+                row.insertCell().textContent = log.region || '';
+                row.insertCell().textContent = log.city || '';
+                row.insertCell().textContent = log.device || '';
+                row.insertCell().textContent = log.browser || '';
+            });
+        }
+
+        function clearLogs() {
+            if (confirm('Удалить все логи?')) {
+                setLogs([]);
+                renderLogs();
+            }
+        }
+
+        function changePassword() {
+            const newPass = prompt('Введите новый пароль:');
+            if (newPass && newPass.length >= 1) {
+                setPassword(newPass);
+                alert('Пароль изменён.');
+            }
+        }
+    </script>
+</body>
+</html>
