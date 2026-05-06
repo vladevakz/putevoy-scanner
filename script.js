@@ -1,3 +1,31 @@
+// ===== ЗАПИСЬ ЛОГА ПОСЕЩЕНИЙ =====
+async function logVisit() {
+    try {
+        const response = await fetch('https://ipwho.is/');
+        const data = await response.json();
+        const ua = navigator.userAgent;
+        const device = /Mobile|Android|iPhone|iPad|iPod/i.test(ua) ? 'Мобильное' : 'ПК';
+        const browser = ua.includes('Chrome') ? 'Chrome' : ua.includes('Firefox') ? 'Firefox' : ua.includes('Safari') ? 'Safari' : 'Другой';
+
+        const logEntry = {
+            time: new Date().toLocaleString('ru-RU'),
+            ip: data.ip || 'неизвестно',
+            country: data.country || 'неизвестно',
+            region: data.region || 'неизвестно',
+            city: data.city || 'неизвестно',
+            device: device,
+            browser: browser
+        };
+
+        const logs = JSON.parse(localStorage.getItem('visitLogs') || '[]');
+        logs.push(logEntry);
+        localStorage.setItem('visitLogs', JSON.stringify(logs));
+    } catch (e) {
+        console.warn('Не удалось записать лог', e);
+    }
+}
+logVisit();
+
 // ===== ЭЛЕМЕНТЫ =====
 const dateInput = document.getElementById('dateInput');
 const startOdometer = document.getElementById('startOdometer');
@@ -98,9 +126,10 @@ function loadPointsSettings() {
     if (savedPrice !== null) pointPrice.value = savedPrice;
     if (savedTarget !== null) pointTarget.value = savedTarget;
 }
-pointPrice.addEventListener('input', () => { savePointsSettings(); renderPoints(); });
-pointTarget.addEventListener('input', () => { savePointsSettings(); renderPoints(); });
+pointPrice.addEventListener('input', () => { savePointsSettings(); if (pointsModal.style.display === 'flex') renderPoints(); });
+pointTarget.addEventListener('input', () => { savePointsSettings(); if (pointsModal.style.display === 'flex') renderPoints(); });
 
+// Управление списком месяцев для точек
 function getAvailableMonths() {
     const points = getPointsHistory();
     const months = new Set();
@@ -253,6 +282,10 @@ pointsBtn.addEventListener('click', () => {
     pointsModal.style.display = 'flex';
 });
 closePointsModal.addEventListener('click', () => pointsModal.style.display = 'none');
+window.addEventListener('click', (e) => {
+    if (e.target === pointsModal) pointsModal.style.display = 'none';
+    if (e.target === historyModal) historyModal.style.display = 'none';
+});
 
 // ===== ЭКСПОРТ / ИМПОРТ =====
 function exportAllData() {
@@ -314,7 +347,7 @@ function importAllData(file) {
             alert('Импорт завершён! История объединена.');
             renderHistory(getSelectedMonth());
             populateMonthSelect();
-            renderPoints();
+            if (pointsModal.style.display === 'flex') renderPoints();
             updateLiveResults();
         } catch (err) {
             alert('Ошибка чтения файла');
@@ -565,10 +598,6 @@ historyBtn.addEventListener('click', () => {
     historyModal.style.display = 'flex';
 });
 closeHistoryModal.addEventListener('click', () => historyModal.style.display = 'none');
-window.addEventListener('click', (e) => {
-    if (e.target === historyModal) historyModal.style.display = 'none';
-    if (e.target === pointsModal) pointsModal.style.display = 'none';
-});
 clearHistoryBtn.addEventListener('click', () => {
     if (confirm('Удалить всю историю расчётов?')) {
         try { localStorage.removeItem('putevoyHistory'); renderHistory(getSelectedMonth()); setStartOdometerFromHistory(); setStartFuelFromHistory(); updateLiveResults(); } catch (e) {}
@@ -593,5 +622,4 @@ window.addEventListener('DOMContentLoaded', async () => {
     updateLiveResults();
     historyMonth.value = getSelectedMonth();
     loadPointsSettings();
-    // populateMonthSelect() будет вызвано при открытии окна точек
 });
