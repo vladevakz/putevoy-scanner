@@ -79,11 +79,14 @@ button:disabled { background: #aaa; cursor: not-allowed; }
 }
 .close { color: #aaa; float: right; font-size: 24px; cursor: pointer; line-height: 1; }
 
-.history-filter {
+.history-filter,
+.points-filter {
     display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
 }
-.history-filter label { font-size: 14px; }
-.history-filter input[type="month"] {
+.history-filter label,
+.points-filter label { font-size: 14px; }
+.history-filter input[type="month"],
+.points-filter input[type="month"] {
     padding: 5px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px;
 }
 
