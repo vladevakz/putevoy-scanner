@@ -129,14 +129,11 @@ function loadPointsSettings() {
 pointPrice.addEventListener('input', () => { savePointsSettings(); if (pointsModal.style.display === 'flex') renderPoints(); });
 pointTarget.addEventListener('input', () => { savePointsSettings(); if (pointsModal.style.display === 'flex') renderPoints(); });
 
-// Управление списком месяцев для точек
 function getAvailableMonths() {
     const points = getPointsHistory();
     const months = new Set();
     points.forEach(p => {
-        if (p.date && p.date.length >= 7) {
-            months.add(p.date.substring(0, 7));
-        }
+        if (p.date && p.date.length >= 7) months.add(p.date.substring(0, 7));
     });
     return Array.from(months).sort();
 }
@@ -169,9 +166,7 @@ function getSelectedPointsMonth() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
-function setSelectedPointsMonth(month) {
-    sessionStorage.setItem('pointsMonth', month);
-}
+function setSelectedPointsMonth(month) { sessionStorage.setItem('pointsMonth', month); }
 
 function renderPoints() {
     const month = pointsMonthSelect.value || getSelectedPointsMonth();
@@ -181,6 +176,7 @@ function renderPoints() {
         const price = parseFloat(pointPrice.value) || 0;
         const target = parseFloat(pointTarget.value) || 0;
 
+        // Только записи за выбранный месяц
         const filtered = allPoints.filter(p => p.date && p.date.startsWith(month));
         filtered.sort((a, b) => a.date.localeCompare(b.date) || (a.timestamp || 0) - (b.timestamp || 0));
 
@@ -201,11 +197,8 @@ function renderPoints() {
         html += '</table>';
         pointsList.innerHTML = html;
 
-        let totalPoints = 0;
-        let totalSum = 0;
-        allPoints.forEach(p => { totalPoints += p.count; totalSum += p.count * price; });
-
-        const remainingRub = target - totalSum;
+        // Итог за месяц + цель
+        const remainingRub = target - monthSum;
         let targetLine = '';
         if (target > 0) {
             const remainingPoints = remainingRub > 0 ? Math.ceil(remainingRub / price) : 0;
@@ -213,8 +206,7 @@ function renderPoints() {
         }
 
         pointsTotalDiv.innerHTML = `
-            📅 <b>${month.replace('-', ' / ')}</b>: точек ${monthPoints}, сумма ${monthSum.toFixed(2)} ₽<br>
-            📊 <b>Всего</b>: точек ${totalPoints}, сумма ${totalSum.toFixed(2)} ₽${targetLine}
+            📅 <b>${month.replace('-', ' / ')}</b>: точек ${monthPoints}, сумма ${monthSum.toFixed(2)} ₽${targetLine}
         `;
 
         document.querySelectorAll('.delete-point').forEach(btn => {
@@ -253,9 +245,7 @@ addPointBtn.addEventListener('click', () => {
         const addedMonth = date.substring(0, 7);
         setSelectedPointsMonth(addedMonth);
         populateMonthSelect();
-        if (pointsMonthSelect.querySelector(`option[value="${addedMonth}"]`)) {
-            pointsMonthSelect.value = addedMonth;
-        }
+        if (pointsMonthSelect.querySelector(`option[value="${addedMonth}"]`)) pointsMonthSelect.value = addedMonth;
         renderPoints();
     } catch (e) { alert('Не удалось добавить точку'); }
 });
@@ -274,9 +264,7 @@ pointsMonthSelect.addEventListener('change', () => {
 pointsBtn.addEventListener('click', () => {
     populateMonthSelect();
     const savedMonth = getSelectedPointsMonth();
-    if (pointsMonthSelect.querySelector(`option[value="${savedMonth}"]`)) {
-        pointsMonthSelect.value = savedMonth;
-    }
+    if (pointsMonthSelect.querySelector(`option[value="${savedMonth}"]`)) pointsMonthSelect.value = savedMonth;
     pointDate.value = new Date().toISOString().split('T')[0];
     renderPoints();
     pointsModal.style.display = 'flex';
@@ -358,13 +346,9 @@ function importAllData(file) {
 }
 
 exportBtn.addEventListener('click', exportAllData);
-importBtn.addEventListener('click', () => {
-    importFile.click();
-});
+importBtn.addEventListener('click', () => importFile.click());
 importFile.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-        importAllData(e.target.files[0]);
-    }
+    if (e.target.files.length > 0) importAllData(e.target.files[0]);
 });
 
 // ===== ПОГОДА =====
