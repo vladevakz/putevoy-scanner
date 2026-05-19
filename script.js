@@ -52,6 +52,7 @@ const closeHistoryModal = document.getElementById('closeHistoryModal');
 const historyList = document.getElementById('historyList');
 const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 const historyMonth = document.getElementById('historyMonth');
+const kmPrice = document.getElementById('kmPrice');
 
 const exportBtn = document.getElementById('exportBtn');
 const importBtn = document.getElementById('importBtn');
@@ -105,6 +106,16 @@ function getHistory() {
 function saveHistory(arr) {
     try { localStorage.setItem('putevoyHistory', JSON.stringify(arr)); } catch (e) { alert('Хранилище переполнено'); }
 }
+
+// ===== ЦЕНА ЗА КМ =====
+function saveKmPrice() {
+    try { localStorage.setItem('kmPrice', kmPrice.value); } catch (e) {}
+}
+function loadKmPrice() {
+    const saved = localStorage.getItem('kmPrice');
+    if (saved !== null) kmPrice.value = saved;
+}
+kmPrice.addEventListener('input', saveKmPrice);
 
 // ===== ТОЧКИ =====
 function getPointsHistory() {
@@ -176,29 +187,28 @@ function renderPoints() {
         const price = parseFloat(pointPrice.value) || 0;
         const target = parseFloat(pointTarget.value) || 0;
 
-        // Только записи за выбранный месяц
         const filtered = allPoints.filter(p => p.date && p.date.startsWith(month));
         filtered.sort((a, b) => a.date.localeCompare(b.date) || (a.timestamp || 0) - (b.timestamp || 0));
 
-        let monthPoints = 0;
-        let monthSum = 0;
+        let monthPoints = 0, monthSum = 0;
         let html = '<table><tr><th>Дата</th><th>Кол-во</th><th>Сумма</th><th></th></tr>';
-        filtered.forEach((p) => {
+        filtered.forEach(p => {
             monthPoints += p.count;
             const daySum = p.count * price;
             monthSum += daySum;
             html += `<tr>
-                <td>${p.date}</td>
-                <td>${p.count}</td>
-                <td>${daySum.toFixed(2)} ₽</td>
+                <td>${p.date}</td><td>${p.count}</td><td>${daySum.toFixed(2)} ₽</td>
                 <td><button class="delete-point" data-timestamp="${p.timestamp}">🗑</button></td>
             </tr>`;
         });
         html += '</table>';
         pointsList.innerHTML = html;
 
-        // Итог за месяц + цель
-        const remainingRub = target - monthSum;
+        // Глобальный остаток до цели (без глобальной суммы)
+        let totalSum = 0;
+        allPoints.forEach(p => { totalSum += p.count * price; });
+
+        const remainingRub = target - totalSum;
         let targetLine = '';
         if (target > 0) {
             const remainingPoints = remainingRub > 0 ? Math.ceil(remainingRub / price) : 0;
@@ -286,7 +296,8 @@ function exportAllData() {
             normHwySummer: normHwySummer.value,
             normHwyWinter: normHwyWinter.value,
             pointPrice: pointPrice.value,
-            pointTarget: pointTarget.value
+            pointTarget: pointTarget.value,
+            kmPrice: kmPrice.value
         }
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -329,8 +340,10 @@ function importAllData(file) {
                 if (s.normHwyWinter) normHwyWinter.value = s.normHwyWinter;
                 if (s.pointPrice) pointPrice.value = s.pointPrice;
                 if (s.pointTarget) pointTarget.value = s.pointTarget;
+                if (s.kmPrice) kmPrice.value = s.kmPrice;
                 saveNormValues();
                 savePointsSettings();
+                saveKmPrice();
             }
             alert('Импорт завершён! История объединена.');
             renderHistory(getSelectedMonth());
@@ -526,7 +539,7 @@ saveBtn.addEventListener('click', () => {
     historyModal.style.display = 'flex';
 });
 
-// ===== ОТОБРАЖЕНИЕ ИСТОРИИ (топливо) =====
+// ===== ОТОБРАЖЕНИЕ ИСТОРИИ (топливо) с километражом =====
 function renderHistory(month) {
     const history = getHistory();
     if (!history.length) { historyList.innerHTML = '<p>История пуста.</p>'; return; }
@@ -551,7 +564,16 @@ function renderHistory(month) {
         </tr>`;
     });
     html += '</table>';
-    html += `<div style="margin-top:8px;font-weight:bold;">🏙️ Город: ${totalCity.toFixed(1)} км | 🛣️ Трасса: ${totalHwy.toFixed(1)} км | 📏 Общий: ${(totalCity + totalHwy).toFixed(1)} км<br>⛽ Заправлено: ${totalFuel.toFixed(2)} л</div>`;
+
+    const totalKm = totalCity + totalHwy;
+    const pricePerKm = parseFloat(kmPrice.value) || 0;
+    const totalKmCost = totalKm * pricePerKm;
+
+    html += `<div style="margin-top:8px;font-weight:bold;">
+        🏙️ Город: ${totalCity.toFixed(1)} км | 🛣️ Трасса: ${totalHwy.toFixed(1)} км | 📏 Общий: ${totalKm.toFixed(1)} км<br>
+        ⛽ Заправлено: ${totalFuel.toFixed(2)} л<br>
+        💰 Стоимость пробега (${pricePerKm.toFixed(2)} ₽/км): ${totalKmCost.toFixed(2)} ₽
+    </div>`;
     historyList.innerHTML = html;
 
     document.querySelectorAll('.delete-entry').forEach(btn => {
@@ -599,6 +621,7 @@ seasonRadios.forEach(r => r.addEventListener('change', async () => { currentWeat
 // ===== СТАРТ =====
 window.addEventListener('DOMContentLoaded', async () => {
     loadNormValues();
+    loadKmPrice();
     dateInput.value = new Date().toISOString().split('T')[0];
     setStartOdometerFromHistory();
     setStartFuelFromHistory();
