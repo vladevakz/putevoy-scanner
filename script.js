@@ -204,7 +204,6 @@ function renderPoints() {
         html += '</table>';
         pointsList.innerHTML = html;
 
-        // Глобальный остаток до цели (без глобальной суммы)
         let totalSum = 0;
         allPoints.forEach(p => { totalSum += p.count * price; });
 
@@ -572,7 +571,7 @@ function renderHistory(month) {
     html += `<div style="margin-top:8px;font-weight:bold;">
         🏙️ Город: ${totalCity.toFixed(1)} км | 🛣️ Трасса: ${totalHwy.toFixed(1)} км | 📏 Общий: ${totalKm.toFixed(1)} км<br>
         ⛽ Заправлено: ${totalFuel.toFixed(2)} л<br>
-        💰 Стоимость пробега (${pricePerKm.toFixed(2)} ₽/км): ${totalKmCost.toFixed(2)} ₽
+        💰 Стоимость пробега (${pricePerKm.toFixed(2)} ₽/км): <span style="color:#d32f2f;font-size:1.2em;">${totalKmCost.toFixed(2)} ₽</span>
     </div>`;
     historyList.innerHTML = html;
 
