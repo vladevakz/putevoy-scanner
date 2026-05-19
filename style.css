@@ -80,15 +80,20 @@ button:disabled { background: #aaa; cursor: not-allowed; }
 .close { color: #aaa; float: right; font-size: 24px; cursor: pointer; line-height: 1; }
 
 .history-filter,
+.km-price-row,
 .points-filter {
     display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
 }
 .history-filter label,
+.km-price-row label,
 .points-filter label { font-size: 14px; }
 .history-filter input[type="month"],
 .points-filter select {
     padding: 5px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px;
     background: white;
+}
+.km-price-row input[type="number"] {
+    width: 80px; padding: 5px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px;
 }
 
 .history-actions {
