@@ -204,10 +204,8 @@ function renderPoints() {
         html += '</table>';
         pointsList.innerHTML = html;
 
-        let totalSum = 0;
-        allPoints.forEach(p => { totalSum += p.count * price; });
-
-        const remainingRub = target - totalSum;
+        // Цель привязана к выбранному месяцу
+        const remainingRub = target - monthSum;
         let targetLine = '';
         if (target > 0) {
             const remainingPoints = remainingRub > 0 ? Math.ceil(remainingRub / price) : 0;
