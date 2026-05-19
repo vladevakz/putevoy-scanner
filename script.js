@@ -204,7 +204,7 @@ function renderPoints() {
         html += '</table>';
         pointsList.innerHTML = html;
 
-        // Цель привязана к выбранному месяцу
+        // Оценка цели строго за выбранный месяц
         const remainingRub = target - monthSum;
         let targetLine = '';
         if (target > 0) {
