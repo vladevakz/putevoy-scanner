@@ -213,7 +213,10 @@ function renderPoints() {
         }
 
         pointsTotalDiv.innerHTML = `
-            📅 <b>${month.replace('-', ' / ')}</b>: точек ${monthPoints}, сумма ${monthSum.toFixed(2)} ₽${targetLine}
+            <div class="frame-target">
+                📅 <b>${month.replace('-', ' / ')}</b>: точек ${monthPoints}, сумма ${monthSum.toFixed(2)} ₽<br>
+                ${targetLine}
+            </div>
         `;
 
         document.querySelectorAll('.delete-point').forEach(btn => {
@@ -566,7 +569,7 @@ function renderHistory(month) {
     const pricePerKm = parseFloat(kmPrice.value) || 0;
     const totalKmCost = totalKm * pricePerKm;
 
-    html += `<div style="margin-top:8px;font-weight:bold;">
+    html += `<div class="frame-red" style="margin-top:8px;">
         🏙️ Город: ${totalCity.toFixed(1)} км | 🛣️ Трасса: ${totalHwy.toFixed(1)} км | 📏 Общий: ${totalKm.toFixed(1)} км<br>
         ⛽ Заправлено: ${totalFuel.toFixed(2)} л<br>
         💰 Стоимость пробега (${pricePerKm.toFixed(2)} ₽/км): <span style="color:#d32f2f;font-size:1.2em;">${totalKmCost.toFixed(2)} ₽</span>
